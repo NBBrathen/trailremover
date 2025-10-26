@@ -1,0 +1,43 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data directories
+data/uploads/*
+data/processed/*
+data/temp/*
+!data/uploads/.gitkeep
+!data/processed/.gitkeep
+!data/temp/.gitkeep
+
+# Logs
+*.log
+
+# FITS files
+*.fits
+*.fit
+*.fts
