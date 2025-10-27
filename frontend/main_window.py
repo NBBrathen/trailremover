@@ -1,15 +1,33 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QLabel, QWidget
+from PyQt5.QtWidgets import (
+    QApplication,
+    QLabel,
+    QWidget,
+    QPushButton,
+    QGridLayout
+)
 
 app = QApplication(sys.argv)
 #app = QApplication([])
 
-# create the window
-window = QWidget()
+window = QWidget() # create the window
 window.setWindowTitle("TrailRemover")
 window.setGeometry(100, 100, 1300, 750) # x, y, width, height
-introMsg = QLabel("<h1>Welcome to the Trail Remover application!</h1>", parent=window)
-introMsg.move(60, 15)
+
+layout = QGridLayout()
+layout.addWidget(
+    QLabel("<h1>Welcome to the Trail Remover application!</h1>"), 0, 0, 1, 2
+    #QPushButton("Button (2, 1) + 2 Columns Span"), 0, 0, 1, 2
+)
+# TODO: move the label to the middle of the screen
+#introMsg.move(375, 15)
+
+layout.addWidget(QPushButton("Exit"), 1, 0)
+layout.addWidget(QPushButton("Load Image"), 1, 1)
+# TODO: move the buttons to the left and right
+#exitButton.move(50, 400)
+
+window.setLayout(layout)
 
 # show the window
 window.show()
