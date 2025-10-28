@@ -23,7 +23,7 @@ class ImageProcessingService:
     def __init__(self):
         self.supported_extensions = ['.fits', '.fit', '.fts']
 
-    def load_fits_image(selfself, file_path: Path) -> Optional[np.ndarray]:
+    def load_fits_image(self, file_path: Path) -> Optional[np.ndarray]:
         """
         Here we load a FITS image file and return the image data as a numpy array
         """
