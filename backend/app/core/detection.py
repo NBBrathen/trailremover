@@ -22,7 +22,7 @@ def detect_trails(image_data: np.ndarray) -> List[Dict[str, Any]]:
     - end_point: (x,y) coordinates of trail end
     - width: Estimated width of the trail in pixels
     - confidence: Detection confidence score (0-1)
-    - mask: Binary mast of the trail pixels
+    - mask: Binary mask of the trail pixels
 
     Example return value:
     [
