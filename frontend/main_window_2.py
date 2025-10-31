@@ -1,7 +1,8 @@
 import sys
 
-from PyQt5.QtCore import QSize, Qt
-
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt
+from PyQt5.uic import loadUi
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -11,7 +12,9 @@ from PyQt5.QtWidgets import (
     QToolBar,
     QAction,
     QPushButton,
-    QVBoxLayout
+    QVBoxLayout,
+    QDialog,
+    QFileDialog
 )
 
 class LoadImageWindow(QWidget):
@@ -21,11 +24,13 @@ class LoadImageWindow(QWidget):
     into the program to be used later on.
     """
     def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        self.label = QLabel("Load Image window")
-        layout.addWidget(self.label)
-        self.setLayout(layout)
+        super(LoadImageWindow, self).__init__()
+        loadUi("load_image.ui", self)
+
+        #layout = QVBoxLayout()
+        #self.label = QLabel("Load Image window")
+        #layout.addWidget(self.label)
+        #self.setLayout(layout)
 
 class Window(QMainWindow):
     def __init__(self):
@@ -96,8 +101,17 @@ class Window(QMainWindow):
         self.setStatusBar(status)
 
 if __name__ == "__main__":
-    app = QApplication([])
-    window = Window()
-    window.setGeometry(100, 100, 1300, 750)
-    window.show()
+    #app = QApplication([])
+    #window = Window()
+    #window.setGeometry(100, 100, 1300, 750)
+    #window.show()
+
+    app = QApplication(sys.argv)
+    load_image_window = LoadImageWindow()
+    widget = QtWidgets.QtStackedWidget()
+    widget.addWidget(load_image_window)
+    widget.setFixedWidth(400)
+    widget.setFixedHeight(300)
+    widget.show()
+
     sys.exit(app.exec())
