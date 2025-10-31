@@ -7,21 +7,20 @@ from PyQt5.QtCore import Qt
 from PyQt5.uic import loadUi
 from PyQt5.QtWidgets import (
     QApplication,
-    QWidget,
-    QLabel,
     QMainWindow,
+    QLabel,
     QStatusBar,
     QToolBar,
-    QAction,
-    QPushButton,
-    QVBoxLayout,
     QDialog,
+    #QAction,
+    #QWidget,
+    QPushButton,
     QFileDialog
 )
 
 class LoadImageWindow(QDialog):
     """
-    This window is displayed once the user clicks the'Load Image'
+    This window is displayed once the user clicks the 'Load Image'
     button on the main window. It allows the user to add FITS images
     into the program to be used later on.
     """
@@ -37,23 +36,22 @@ class LoadImageWindow(QDialog):
         self.browse.clicked.connect(self.browse_files)
 
     def browse_files(self):
-        fname = QFileDialog.getOpenFileName(self, 'Load Image', os.path.expanduser('~'), 'FITS Images (*.fit)') # self, name, path, filetype
+        fname = QFileDialog.getOpenFileName(
+            self, 
+            'Load Image', 
+            os.path.expanduser('~'), 
+            'FITS Images (*.fit)') # self, browser name, default path, file type
         self.filename.setText(fname[0])
-
-        #layout = QVBoxLayout()
-        #self.label = QLabel("Load Image window")
-        #layout.addWidget(self.label)
-        #self.setLayout(layout)
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        # Set the title and size of the project
+        # Set the title of the project
         self.setWindowTitle("Trail Remover")
 
-        # Give the user a nice welcome message as soon as they open the GUI
+        # Give the user a nice welcome message once they open the GUI
         welcomeMsg = QLabel("<h1>Welcome to the Trail Remover application!</h1>")
-        welcomeMsg.setAlignment(Qt.AlignCenter) # move to the middle of the screen
+        welcomeMsg.setAlignment(Qt.AlignCenter) # move the text to the middle of the screen
         self.setCentralWidget(welcomeMsg)
 
         # create the menu, toolbar, and status bar
@@ -88,12 +86,8 @@ class MainWindow(QMainWindow):
         dialog.exec_()
 
     def _createStatusBar(self):
+        # default status is blank: ""
         status = QStatusBar()
-        
-        # add a default message to the status bar
-        status.showMessage("")
-
-        # add the status bar!
         self.setStatusBar(status)
 
 if __name__ == "__main__":
@@ -101,15 +95,4 @@ if __name__ == "__main__":
     window = MainWindow()
     window.setGeometry(100, 100, 1300, 750)
     window.show()
-
-    """
-    app = QApplication(sys.argv)
-    load_image_window = LoadImageWindow()
-    widget = QtWidgets.QStackedWidget()
-    widget.addWidget(load_image_window)
-    widget.setFixedWidth(400)
-    widget.setFixedHeight(300)
-    widget.show()
-    """
-
     sys.exit(app.exec())
