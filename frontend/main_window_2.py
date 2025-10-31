@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (
     QFileDialog
 )
 
-class LoadImageWindow(QWidget):
+class LoadImageWindow(QDialog):
     """
     This window is displayed once the user clicks the'Load Image'
     button on the main window. It allows the user to add FITS images
@@ -25,7 +25,10 @@ class LoadImageWindow(QWidget):
     """
     def __init__(self):
         super(LoadImageWindow, self).__init__()
-        loadUi("load_image.ui", self)
+        import os
+        ui_path = os.path.join(os.path.dirname(__file__), "load_image.ui")
+        print("Loading UI from:", ui_path)  # debug print
+        loadUi(ui_path, self)
 
         #layout = QVBoxLayout()
         #self.label = QLabel("Load Image window")
@@ -108,7 +111,7 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     load_image_window = LoadImageWindow()
-    widget = QtWidgets.QtStackedWidget()
+    widget = QtWidgets.QStackedWidget()
     widget.addWidget(load_image_window)
     widget.setFixedWidth(400)
     widget.setFixedHeight(300)
