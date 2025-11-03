@@ -36,7 +36,12 @@ class LoadImageWindow(QDialog):
 
         ui_path = Path(__file__).parent / "load_image.ui"
         loadUi(str(ui_path), self)
+        
+        # when the browse button is clicked, browse the user's files
         self.browse.clicked.connect(self.browse_files)
+
+        # when the upload button is clicked, close the window
+        self.upload_image.clicked.connect(self.close)
 
     def browse_files(self):
         fname = QFileDialog.getOpenFileName(
@@ -88,7 +93,6 @@ class MainWindow(QMainWindow):
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
-
     def image_processing_state(self):
      #updating the toolbar after the user uploads their images
         toolbar = self.findChild(QToolBar)
@@ -96,10 +100,11 @@ class MainWindow(QMainWindow):
             toolbar.clear() 
             #repopulate the toolbar with exit, return to previous
             toolbar.addAction("Exit", self.close)
+
+            # TODO: implement previous button
             toolbar.addAction("Previous", self.main_state)
 
         #method not finished
-
 
     def _createToolBar(self):
         toolbar = QToolBar("This is the one and only toolbar")
