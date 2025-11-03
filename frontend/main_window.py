@@ -40,7 +40,7 @@ class LoadImageWindow(QDialog):
             self, 
             'Load Image', 
             os.path.expanduser('~'), 
-            'FITS Images (*.fit)') # self, browser name, default path, file type
+            'FITS Images (*.fits)') # self, browser name, default path, file type
         self.filename.setText(fname[0])
         
 class MainWindow(QMainWindow):
@@ -93,7 +93,7 @@ class MainWindow(QMainWindow):
             toolbar.clear() 
             #repopulate the toolbar with exit, return to previous
             toolbar.addAction("Exit", self.close)
-            toolbar.addAction("Previous", self.create_main_state)
+            toolbar.addAction("Previous", self.main_state)
         #method not finished
 
 
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         # let the user know what this button does & add it to the toolbar
         load_image.setStatusTip("Click here to pull up the Load Image screen!")
         toolbar.addWidget(load_image)
-        load_image.clicked.connect(self.image_processing_state)
+        load_image.clicked.connect(self.show_new_window)
 
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
@@ -119,10 +119,8 @@ class MainWindow(QMainWindow):
 
     def show_new_window(self):
         dialog = LoadImageWindow()
-        imagesLoaded = dialog.exec_()
-
-        #if the user uploads images, then we can move to the image processing state
-        if imagesLoaded: self.image_processing_state()
+        dialog.exec_()
+        self.image_processing_state()
 
     def _createStatusBar(self):
         # default status is blank: ""
