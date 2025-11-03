@@ -111,15 +111,16 @@ class MainWindow(QMainWindow):
         # let the user know what this button does & add it to the toolbar
         load_image.setStatusTip("Click here to pull up the Load Image screen!")
         toolbar.addWidget(load_image)
-        load_image.clicked.connect(self.show_new_window)
 
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
-
     def show_new_window(self):
         dialog = LoadImageWindow()
         dialog.exec_()
+        self.show_new_toolbar()
+
+    def show_new_toolbar(self):
         self.image_processing_state()
 
     def _createStatusBar(self):
