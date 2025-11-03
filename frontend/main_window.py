@@ -122,7 +122,7 @@ class MainWindow(QMainWindow):
         imagesLoaded= dialog.exec_()
 
         #if the user uploads images, then we can move to the image processing state
-        if dialog.exec(): self.image_processing_state()
+        if imagesLoaded: self.image_processing_state()
 
     def _createStatusBar(self):
         # default status is blank: ""
