@@ -18,9 +18,6 @@ from PyQt5.QtWidgets import (
     QFileDialog
 )
 
-# global variable to show which state the toolbar is currently in
-current_state = "Main_Window"
-
 class LoadImageWindow(QDialog):
     """
     This window is displayed once the user clicks the 'Load Image'
@@ -36,12 +33,7 @@ class LoadImageWindow(QDialog):
 
         ui_path = Path(__file__).parent / "load_image.ui"
         loadUi(str(ui_path), self)
-        
-        # when the browse button is clicked, browse the user's files
         self.browse.clicked.connect(self.browse_files)
-
-        # when the upload button is clicked, close the window
-        self.upload_image.clicked.connect(self.close)
 
     def browse_files(self):
         fname = QFileDialog.getOpenFileName(
@@ -98,13 +90,19 @@ class MainWindow(QMainWindow):
         toolbar = self.findChild(QToolBar)
         if toolbar:
             toolbar.clear() 
-            #repopulate the toolbar with exit, return to previous
+            #repopulate the toolbar with exit & return to previous
             toolbar.addAction("Exit", self.close)
-
-            # TODO: implement previous button
             toolbar.addAction("Previous", self.main_state)
+            
+            # detect trails button added (currently only takes them to the next stage)
+            detect_trails = QPushButton("Detect Trails")
+            detect_trails.clicked.connect(self.loading_screen)
+            detect_trails.setStatusTip("Click here to start detecting the trails")
+            toolbar.addWidget(detect_trails)
+    
 
-        #method not finished
+   # def loading_screen (self): 
+
 
     def _createToolBar(self):
         toolbar = QToolBar("This is the one and only toolbar")
@@ -130,10 +128,7 @@ class MainWindow(QMainWindow):
         self.show_new_toolbar()
 
     def show_new_toolbar(self):
-        global current_state
-        if current_state == "Main_Window":
-            self.image_processing_state()
-            current_state = "Image_Processing"
+        self.image_processing_state()
 
     def _createStatusBar(self):
         # default status is blank: ""
