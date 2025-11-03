@@ -42,12 +42,16 @@ class LoadImageWindow(QDialog):
             os.path.expanduser('~'), 
             'FITS Images (*.fit)') # self, browser name, default path, file type
         self.filename.setText(fname[0])
-
+        
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Set the title of the project
         self.setWindowTitle("Trail Remover")
+           
+        #def _createMenu(self):
+        #menu = self.menuBar().addMenu("&Menu")
+        #menu.addAction("&Exit", self.close)
 
         # Give the user a nice welcome message once they open the GUI
         welcomeMsg = QLabel("<h1>Welcome to the Trail Remover application!</h1>")
@@ -56,12 +60,42 @@ class MainWindow(QMainWindow):
 
         # create the menu, toolbar, and status bar
         #self._createMenu()
-        self._createToolBar()
+        self.main_state()
         self._createStatusBar()
 
-    #def _createMenu(self):
-        #menu = self.menuBar().addMenu("&Menu")
-        #menu.addAction("&Exit", self.close)
+    def main_state(self):
+        
+        welcomeMsg = QLabel("<h1>Welcome to the Trail Remover application!</h1>")
+        welcomeMsg.setAlignment(Qt.AlignCenter)
+        self.setCentralWidget(welcomeMsg)
+        
+        # Create toolbar
+        toolbar = QToolBar("Main Toolbar")
+        toolbar.addAction("Exit", self.close)
+
+        # add "Load Image" button, which will take the user to a new window 
+        # & trigger image processing state
+        load_image = QPushButton("Load Image")
+        load_image.clicked.connect(self.show_new_window)
+
+        # let the user know what this button does & add it to the toolbar
+        load_image.setStatusTip("Click here to pull up the Load Image screen!")
+        toolbar.addWidget(load_image)
+
+        # add the toolbar itself!
+        self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+
+
+    def image_processing_state(self):
+     #updating the toolbar after the user uploads their images
+        toolbar = self.findChild(QToolBar)
+        if toolbar:
+            toolbar.clear() 
+            #repopulate the toolbar with exit, return to previous
+            toolbar.addAction("Exit", self.close)
+            toolbar.addAction("Previous", self.create_main_state)
+        #method not finished
+
 
     def _createToolBar(self):
         toolbar = QToolBar("This is the one and only toolbar")
@@ -77,13 +111,18 @@ class MainWindow(QMainWindow):
         # let the user know what this button does & add it to the toolbar
         load_image.setStatusTip("Click here to pull up the Load Image screen!")
         toolbar.addWidget(load_image)
+        load_image.clicked.connect(self.image_processing_state)
 
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
+
     def show_new_window(self):
         dialog = LoadImageWindow()
-        dialog.exec_()
+        imagesLoaded= dialog.exec_()
+
+        #if the user uploads images, then we can move to the image processing state
+        if dialog.exec(): self.image_processing_state()
 
     def _createStatusBar(self):
         # default status is blank: ""
