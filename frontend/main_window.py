@@ -18,6 +18,9 @@ from PyQt5.QtWidgets import (
     QFileDialog
 )
 
+# global variable to show which state the toolbar is currently in
+current_state = "Main_Window"
+
 class LoadImageWindow(QDialog):
     """
     This window is displayed once the user clicks the 'Load Image'
@@ -94,6 +97,7 @@ class MainWindow(QMainWindow):
             #repopulate the toolbar with exit, return to previous
             toolbar.addAction("Exit", self.close)
             toolbar.addAction("Previous", self.main_state)
+
         #method not finished
 
 
@@ -121,7 +125,10 @@ class MainWindow(QMainWindow):
         self.show_new_toolbar()
 
     def show_new_toolbar(self):
-        self.image_processing_state()
+        global current_state
+        if current_state == "Main_Window":
+            self.image_processing_state()
+            current_state = "Image_Processing"
 
     def _createStatusBar(self):
         # default status is blank: ""
