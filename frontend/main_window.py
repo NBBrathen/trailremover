@@ -18,6 +18,9 @@ from PyQt5.QtWidgets import (
     QFileDialog
 )
 
+# global variable to show which state the toolbar is currently in
+current_state = "Main_Window"
+
 class LoadImageWindow(QDialog):
     """
     This window is displayed once the user clicks the 'Load Image'
@@ -33,7 +36,14 @@ class LoadImageWindow(QDialog):
 
         ui_path = Path(__file__).parent / "load_image.ui"
         loadUi(str(ui_path), self)
+
+        # when the browse button is clicked, browse the user's files
         self.browse.clicked.connect(self.browse_files)
+
+
+        # when the upload button is clicked, close the window
+        self.upload_image.clicked.connect(self.close)
+
 
     def browse_files(self):
         fname = QFileDialog.getOpenFileName(
@@ -96,7 +106,7 @@ class MainWindow(QMainWindow):
             
             # detect trails button added (currently only takes them to the next stage)
             detect_trails = QPushButton("Detect Trails")
-            detect_trails.clicked.connect(self.loading_screen)
+            #detect_trails.clicked.connect(self.loading_screen)
             detect_trails.setStatusTip("Click here to start detecting the trails")
             toolbar.addWidget(detect_trails)
     
@@ -128,7 +138,11 @@ class MainWindow(QMainWindow):
         self.show_new_toolbar()
 
     def show_new_toolbar(self):
-        self.image_processing_state()
+        global current_state
+        if current_state == "Main_Window":
+            self.image_processing_state()
+            current_state = "Image_Processing"
+
 
     def _createStatusBar(self):
         # default status is blank: ""
