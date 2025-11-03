@@ -119,7 +119,7 @@ class MainWindow(QMainWindow):
 
     def show_new_window(self):
         dialog = LoadImageWindow()
-        imagesLoaded= dialog.exec_()
+        imagesLoaded = dialog.exec_()
 
         #if the user uploads images, then we can move to the image processing state
         if imagesLoaded: self.image_processing_state()
