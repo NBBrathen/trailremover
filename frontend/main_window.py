@@ -46,12 +46,18 @@ class LoadImageWindow(QDialog):
 
 
     def browse_files(self):
-        fname = QFileDialog.getOpenFileName(
-            self, 
-            'Load Image', 
-            os.path.expanduser('~'), 
-            'FITS Images (*.fits)') # self, browser name, default path, file type
-        self.filename.setText(fname[0])
+        dir = QFileDialog.getExistingDirectory(self, "Load Image", os.path.expanduser('~')) # self, browser name, default path can also be ""
+        self.filename.setText(dir)
+
+        fits_images = []
+        for root, _, files in os.walk(dir):
+            for file in files:
+                if file.endswith(".fit") or file.endswith(".fits") or file.endswith(".fts"):
+                    fits_images.append(os.path.join(root, file))
+        
+        for image in fits_images:
+            print(image)
+
         
 class MainWindow(QMainWindow):
     def __init__(self):
