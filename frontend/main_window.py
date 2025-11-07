@@ -5,6 +5,7 @@ from pathlib import Path
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.uic import loadUi
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -15,11 +16,13 @@ from PyQt5.QtWidgets import (
     #QAction,
     #QWidget,
     QPushButton,
-    QFileDialog
+    QFileDialog,
 )
 
 # global variable to show which state the toolbar is currently in
 current_state = "Main_Window"
+# global variable to hold all the images from the folder the user inputs
+fits_images = []
 
 class LoadImageWindow(QDialog):
     """
@@ -49,7 +52,8 @@ class LoadImageWindow(QDialog):
         dir = QFileDialog.getExistingDirectory(self, "Load Image", os.path.expanduser('~')) # self, browser name, default path can also be ""
         self.filename.setText(dir)
 
-        fits_images = []
+        #fits_images = []
+        global fits_images
         for root, _, files in os.walk(dir):
             for file in files:
                 if file.endswith(".fit") or file.endswith(".fits") or file.endswith(".fts"):
@@ -80,7 +84,6 @@ class MainWindow(QMainWindow):
         self._createStatusBar()
 
     def main_state(self):
-        
         welcomeMsg = QLabel("<h1>Welcome to the Trail Remover application!</h1>")
         welcomeMsg.setAlignment(Qt.AlignCenter)
         self.setCentralWidget(welcomeMsg)
@@ -101,8 +104,23 @@ class MainWindow(QMainWindow):
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
+    def display_image(self, file_path):
+        # get the Central Widget label
+        image = self.findChild(QLabel)
+    
+        # get the file that the user uploaded
+        # TODO: upload MULTIPLE files
+        pixmap = QPixmap(file_path)
+        #pixmap = pixmap.scaled(self.image_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        
+        # turn the label into an image
+        image.setPixmap(pixmap)
+
     def image_processing_state(self):
-     #updating the toolbar after the user uploads their images
+        # update the central widget after the user uploads their images
+        self.display_image(fits_images[0])
+
+        # update the toolbar after the user uploads their images
         toolbar = self.findChild(QToolBar)
         if toolbar:
             toolbar.clear() 
@@ -115,10 +133,8 @@ class MainWindow(QMainWindow):
             #detect_trails.clicked.connect(self.loading_screen)
             detect_trails.setStatusTip("Click here to start detecting the trails")
             toolbar.addWidget(detect_trails)
-    
 
    # def loading_screen (self): 
-
 
     def _createToolBar(self):
         toolbar = QToolBar("This is the one and only toolbar")
@@ -148,7 +164,6 @@ class MainWindow(QMainWindow):
         if current_state == "Main_Window":
             self.image_processing_state()
             current_state = "Image_Processing"
-
 
     def _createStatusBar(self):
         # default status is blank: ""
