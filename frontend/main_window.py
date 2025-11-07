@@ -3,7 +3,7 @@ import sys
 
 from pathlib import Path
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.uic import loadUi
 from PyQt5.QtWidgets import (
     QApplication,
@@ -15,11 +15,19 @@ from PyQt5.QtWidgets import (
     #QAction,
     #QWidget,
     QPushButton,
-    QFileDialog
+    QFileDialog, 
+    QSplashScreen
 )
 
 # global variable to show which state the toolbar is currently in
 current_state = "Main_Window"
+
+class LoadingScreen(QSplashScreen):
+    def __init__(self):
+        super(QSplashScreen, self).__init__()
+        ui_path = Path(__file__).parent / "loading_screen.ui"
+        loadUi(str(ui_path),self)
+
 
 class LoadImageWindow(QDialog):
     """
@@ -74,13 +82,13 @@ class MainWindow(QMainWindow):
         welcomeMsg.setAlignment(Qt.AlignCenter) # move the text to the middle of the screen
         self.setCentralWidget(welcomeMsg)
 
-        # create the menu, toolbar, and status bar
+        # create the menu, toolbar, status bar, and splash/loading screen
         #self._createMenu()
         self.main_state()
         self._createStatusBar()
+        self.loading_screen = LoadingScreen()
 
     def main_state(self):
-        
         welcomeMsg = QLabel("<h1>Welcome to the Trail Remover application!</h1>")
         welcomeMsg.setAlignment(Qt.AlignCenter)
         self.setCentralWidget(welcomeMsg)
@@ -110,14 +118,12 @@ class MainWindow(QMainWindow):
             toolbar.addAction("Exit", self.close)
             toolbar.addAction("Previous", self.main_state)
             
-            # detect trails button added (currently only takes them to the next stage)
+            # detect trails button added- 
+            #upon selecting detect trails it shows them the loading screen 
             detect_trails = QPushButton("Detect Trails")
-            #detect_trails.clicked.connect(self.loading_screen)
+            detect_trails.clicked.connect(self.show_loading_screen)
             detect_trails.setStatusTip("Click here to start detecting the trails")
             toolbar.addWidget(detect_trails)
-    
-
-   # def loading_screen (self): 
 
 
     def _createToolBar(self):
@@ -154,6 +160,13 @@ class MainWindow(QMainWindow):
         # default status is blank: ""
         status = QStatusBar()
         self.setStatusBar(status)
+
+    def show_loading_screen(self):
+         #shows loading screen (default is 24% idk why)
+         self.loading_screen.show()
+
+        #for now it just shows the screen for 5 seconds
+         QTimer.singleShot(5000, self.loading_screen.close)
 
 if __name__ == "__main__":
     app = QApplication([])
