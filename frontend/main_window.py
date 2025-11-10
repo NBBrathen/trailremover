@@ -135,7 +135,11 @@ class MainWindow(QMainWindow):
             toolbar.clear() 
             #repopulate the toolbar with exit & return to previous
             toolbar.addAction("Exit", self.close)
-            toolbar.addAction("Previous", self.main_state)
+
+            # previous button that will clear the toolbar and send you back to the original page
+            prev_button = QPushButton("Previous")
+            prev_button.clicked.connect(self.show_new_toolbar)
+            toolbar.addWidget(prev_button)
             
             # detect trails button added- 
             #upon selecting detect trails it shows them the loading screen 
@@ -174,6 +178,12 @@ class MainWindow(QMainWindow):
         if current_state == "Main_Window":
             self.image_processing_state()
             current_state = "Image_Processing"
+        elif current_state == "Image_Processing":
+            toolbar = self.findChild(QToolBar)
+            for widget in toolbar.actions():
+                toolbar.removeAction(widget)
+            self.main_state()
+            current_state = "Main_Window"
 
     def _createStatusBar(self):
         # default status is blank: ""
