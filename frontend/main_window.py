@@ -57,7 +57,7 @@ class LoadImageWindow(QDialog):
 
 
     def browse_files(self):
-        dir = QFileDialog.getExistingDirectory(self, "Load Image", os.path.expanduser('~')) # self, browser name, default path can also be ""
+        dir = QFileDialog.getExistingDirectory(self, "Load Images", os.path.expanduser('~')) # self, browser name, default path can also be ""
         self.filename.setText(dir)
 
         #fits_images = []
@@ -101,19 +101,19 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("Main Toolbar")
         toolbar.addAction("Exit", self.close)
 
-        # add "Load Image" button, which will take the user to a new window 
+        # add "Load Images" button, which will take the user to a new window 
         # & trigger image processing state
-        load_image = QPushButton("Load Image")
-        load_image.clicked.connect(self.show_new_window)
+        load_images = QPushButton("Load Images")
+        load_images.clicked.connect(self.show_new_window)
 
         # let the user know what this button does & add it to the toolbar
-        load_image.setStatusTip("Click here to pull up the Load Image screen!")
-        toolbar.addWidget(load_image)
+        load_images.setStatusTip("Click here to pull up the Load Images screen!")
+        toolbar.addWidget(load_images)
 
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
 
-    def display_image(self, file_path):
+    def display_images(self, file_path):
         # get the Central Widget label
         image = self.findChild(QLabel)
     
@@ -127,7 +127,7 @@ class MainWindow(QMainWindow):
 
     def image_processing_state(self):
         # update the central widget after the user uploads their images
-        self.display_image(fits_images[0])
+        self.display_images(fits_images[0])
 
         # update the toolbar after the user uploads their images
         toolbar = self.findChild(QToolBar)
@@ -138,7 +138,8 @@ class MainWindow(QMainWindow):
 
             # previous button that will clear the toolbar and send you back to the original page
             prev_button = QPushButton("Previous")
-            prev_button.clicked.connect(self.show_new_toolbar)
+            direction = "backwards"
+            prev_button.clicked.connect(lambda: self.show_new_toolbar_image_processing(direction))
             toolbar.addWidget(prev_button)
             
             # detect trails button added- 
@@ -158,12 +159,12 @@ class MainWindow(QMainWindow):
         exit_button.setStatusTip("Clicking this button will exit the program. Are you sure?")
 
         # add "Load Image" button, which will take the user to a new window
-        load_image = QPushButton("Load Image")
-        load_image.clicked.connect(self.show_new_window)
+        load_images = QPushButton("Load Images")
+        load_images.clicked.connect(self.show_new_window)
 
         # let the user know what this button does & add it to the toolbar
-        load_image.setStatusTip("Click here to pull up the Load Image screen!")
-        toolbar.addWidget(load_image)
+        load_images.setStatusTip("Click here to pull up the Load Image screen!")
+        toolbar.addWidget(load_images)
 
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
@@ -171,19 +172,30 @@ class MainWindow(QMainWindow):
     def show_new_window(self):
         dialog = LoadImageWindow()
         dialog.exec_()
-        self.show_new_toolbar()
+        self.show_new_toolbar_main()
 
-    def show_new_toolbar(self):
+    def show_new_toolbar_main(self):
         global current_state
         if current_state == "Main_Window":
             self.image_processing_state()
             current_state = "Image_Processing"
-        elif current_state == "Image_Processing":
-            toolbar = self.findChild(QToolBar)
-            for widget in toolbar.actions():
-                toolbar.removeAction(widget)
-            self.main_state()
-            current_state = "Main_Window"
+
+    def show_new_toolbar_image_processing(self, direction):
+        global current_state
+        if current_state == "Image_Processing":
+            if direction == "forward":
+                toolbar = self.findChild(QToolBar)
+                for widget in toolbar.actions():
+                    toolbar.removeAction(widget)
+                #self.detection_state()
+                current_state = "Detection"
+            elif direction == "backwards": # should be an else statement?
+                toolbar = self.findChild(QToolBar)
+                for widget in toolbar.actions():
+                    toolbar.removeAction(widget)
+                self.main_state()
+                current_state = "Main_Window"
+                
 
     def _createStatusBar(self):
         # default status is blank: ""
