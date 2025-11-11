@@ -88,6 +88,10 @@ class MainWindow(QMainWindow):
 
         # create the menu, toolbar, status bar, and splash/loading screen
         #self._createMenu()
+
+        # Create toolbar
+        self.toolbar = QToolBar("Main Toolbar")
+
         self.main_state()
         self._createStatusBar()
         self.loading_screen = LoadingScreen()
@@ -98,8 +102,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(welcomeMsg)
         
         # Create toolbar
-        toolbar = QToolBar("Main Toolbar")
-        toolbar.addAction("Exit", self.close)
+        #toolbar = QToolBar("Main Toolbar")
+        self.toolbar.clear()
+        self.toolbar.addAction("Exit", self.close)
 
         # add "Load Images" button, which will take the user to a new window 
         # & trigger image processing state
@@ -108,10 +113,10 @@ class MainWindow(QMainWindow):
 
         # let the user know what this button does & add it to the toolbar
         load_images.setStatusTip("Click here to pull up the Load Images screen!")
-        toolbar.addWidget(load_images)
+        self.toolbar.addWidget(load_images)
 
         # add the toolbar itself!
-        self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.toolbar)
 
     def display_images(self, file_path):
         # get the Central Widget label
@@ -130,27 +135,27 @@ class MainWindow(QMainWindow):
         self.display_images(fits_images[0])
 
         # update the toolbar after the user uploads their images
-        toolbar = self.findChild(QToolBar)
-        if toolbar:
-            toolbar.clear() 
+        #toolbar = self.findChild(QToolBar)
+        if self.toolbar:
+            self.toolbar.clear() 
             #repopulate the toolbar with exit & return to previous
-            toolbar.addAction("Exit", self.close)
+            self.toolbar.addAction("Exit", self.close)
 
             # previous button that will clear the toolbar and send you back to the original page
             prev_button = QPushButton("Previous")
             direction = "backwards"
             prev_button.clicked.connect(lambda: self.show_new_toolbar_image_processing(direction))
-            toolbar.addWidget(prev_button)
+            self.toolbar.addWidget(prev_button)
             
             # detect trails button added- 
             #upon selecting detect trails it shows them the loading screen 
             detect_trails = QPushButton("Detect Trails")
             detect_trails.clicked.connect(self.show_loading_screen)
             detect_trails.setStatusTip("Click here to start detecting the trails")
-            toolbar.addWidget(detect_trails)
+            self.toolbar.addWidget(detect_trails)
 
    # def loading_screen (self): 
-
+    """
     def _createToolBar(self):
         toolbar = QToolBar("This is the one and only toolbar")
 
@@ -168,7 +173,8 @@ class MainWindow(QMainWindow):
 
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, toolbar)
-
+    """
+    
     def show_new_window(self):
         dialog = LoadImageWindow()
         dialog.exec_()
@@ -177,20 +183,22 @@ class MainWindow(QMainWindow):
     def show_new_toolbar_main(self):
         global current_state
         if current_state == "Main_Window":
+            #toolbar = self.findChild(QToolBar)
+            #for widget in toolbar.actions():
+                    #toolbar.removeAction(widget)
             self.image_processing_state()
             current_state = "Image_Processing"
 
     def show_new_toolbar_image_processing(self, direction):
         global current_state
         if current_state == "Image_Processing":
+            toolbar = self.findChild(QToolBar)
             if direction == "forward":
-                toolbar = self.findChild(QToolBar)
                 for widget in toolbar.actions():
                     toolbar.removeAction(widget)
                 #self.detection_state()
                 current_state = "Detection"
             elif direction == "backwards": # should be an else statement?
-                toolbar = self.findChild(QToolBar)
                 for widget in toolbar.actions():
                     toolbar.removeAction(widget)
                 self.main_state()
