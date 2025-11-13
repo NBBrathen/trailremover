@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # Restoration settings
+    RESTORATION_METHOD: str = "ns"  # 'telea', 'ns', or 'biharmonic'
+    RESTORATION_RADIUS: int = 25
+    RESTORATION_EXPAND_MASK: int = 10
+    RESTORATION_ITERATIONS: int = 5
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

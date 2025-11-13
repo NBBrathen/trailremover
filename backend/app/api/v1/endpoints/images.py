@@ -11,13 +11,14 @@ import shutil
 from app.config import settings
 from app.models.job import CreateJobResponse
 from app.services.job_manager import job_manager, JobStatus
-from app.services.image_processor import ImageProcessingService
+from app.services.image_processor import ImageProcessor  # ← Fixed import
+from app.core.detection import detect_trails  # ← Add this
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Create image processor instance
-image_processor = ImageProcessingService()
+image_processor = ImageProcessor()  # ← Fixed class name
 
 
 async def process_image_job(job_id: str, file_path: Path):
@@ -33,38 +34,20 @@ async def process_image_job(job_id: str, file_path: Path):
         # Load the FITS image
         image_data = image_processor.load_fits_image(file_path)
 
-        if image_data is None:
-            job_manager.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message="Failed to load FITS image"
-            )
-            return
+        logger.info(f"Loaded image for job {job_id}: shape={image_data.shape}")
 
         # Run detection
-        detection_result = image_processor.run_detection(image_data)
+        trails = detect_trails(image_data)
 
-        if not detection_result['success']:
-            job_manager.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message=detection_result.get('error', 'Detection failed')
-            )
-            return
+        logger.info(f"Detection complete for job {job_id}: found {len(trails)} trail(s)")
 
         # Store detected trails
-        job_manager.set_detected_trails(job_id, detection_result['trails'])
+        job_manager.set_detected_trails(job_id, trails)
 
         # Update status to AWAITING_REVIEW
-        job_manager.update_job_status(
-            job_id,
-            JobStatus.AWAITING_REVIEW
-        )
+        job_manager.update_job_status(job_id, JobStatus.AWAITING_REVIEW)
 
-        logger.info(
-            f"Job {job_id} completed detection: "
-            f"found {detection_result['trail_count']} trail(s)"
-        )
+        logger.info(f"Job {job_id} ready for review")
 
     except Exception as e:
         logger.error(f"Error processing job {job_id}: {e}", exc_info=True)
@@ -77,8 +60,8 @@ async def process_image_job(job_id: str, file_path: Path):
 
 @router.post("/upload", response_model=CreateJobResponse)
 async def upload_image(
-        background_tasks: BackgroundTasks,
-        file: UploadFile = File(...)
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
 ):
     """
     Upload a FITS image for trail detection.
