@@ -1,9 +1,22 @@
+# FastAPI and Web Framework
 fastapi
 uvicorn[standard]
 python-multipart
+
+# Data Validation
 pydantic
 pydantic-settings
-astropy
+
+# Astronomy and Image Processing
+astropy>=6.0.0
 numpy
 opencv-python
 scikit-image
+
+# Machine Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+tqdm>=4.65.0
+matplotlib>=3.7.0
+scipy>=1.10.0

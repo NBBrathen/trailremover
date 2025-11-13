@@ -41,3 +41,22 @@ data/temp/*
 *.fits
 *.fit
 *.fts
+
+# ML Model checkpoints (too large for git)
+data/models/
+data/raw/
+
+# Test outputs
+sample_*.png
+model_predictions.png
+inference_test_results.png
+*_test_results.png
+
+# Temporary test scripts
+test_*.py
+continue_training.py
+verify_data.py
+text_blocks.py
+
+# IDE files
+.idea/
