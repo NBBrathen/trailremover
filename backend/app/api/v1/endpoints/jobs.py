@@ -12,21 +12,17 @@ from app.config import settings
 from app.models.job import JobResponse
 from app.models.trail import DetectionResponse, Trail, CorrectionRequest
 from app.services.job_manager import job_manager, JobStatus
-from app.services.image_processor import ImageProcessingService
+from app.services.image_processor import ImageProcessor
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Create image processor instance
-image_processor = ImageProcessingService()
+image_processor = ImageProcessor()
 
 
 async def apply_corrections_job(job_id: str, trails_to_correct: List[str]):
-    """
-    Background task to apply corrections and restore pixels.
-
-    This runs asynchronously after the user submits corrections.
-    """
+    """Background task to apply corrections and restore pixels."""
     try:
         # Update status
         job_manager.update_job_status(job_id, JobStatus.CORRECTING)
@@ -40,14 +36,6 @@ async def apply_corrections_job(job_id: str, trails_to_correct: List[str]):
         # Load original image
         file_path = Path(job['file_path'])
         image_data = image_processor.load_fits_image(file_path)
-
-        if image_data is None:
-            job_manager.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message="Failed to load original image"
-            )
-            return
 
         # Get all detected trails
         all_trails = job.get('detected_trails', [])
@@ -69,30 +57,16 @@ async def apply_corrections_job(job_id: str, trails_to_correct: List[str]):
             trails_to_apply
         )
 
-        if corrected_image is None:
-            job_manager.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message="Pixel restoration failed"
-            )
-            return
-
         # Save corrected image
         output_filename = f"corrected_{job['filename']}"
         output_path = settings.PROCESSED_DIR / output_filename
 
-        success = image_processor.save_fits_image(
+        # Just call save - it will raise an exception if it fails
+        image_processor.save_fits_image(
             corrected_image,
-            output_path
+            output_path,
+            original_path=file_path
         )
-
-        if not success:
-            job_manager.update_job_status(
-                job_id,
-                JobStatus.FAILED,
-                error_message="Failed to save corrected image"
-            )
-            return
 
         # Update job with corrected image path
         job_manager.update_job_status(
