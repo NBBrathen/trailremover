@@ -2,6 +2,7 @@ import os
 import sys
 
 from pathlib import Path
+import time
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.uic import loadUi
@@ -29,6 +30,13 @@ class LoadingScreen(QSplashScreen):
         ui_path = Path(__file__).parent / "loading_screen.ui"
         loadUi(str(ui_path),self)
 
+    def progress(self):
+        # from 0% to 100%...
+        for i in range(1, 101):
+            # update by 1% every 0.05s
+            time.sleep(0.05)
+            self.progressBar.setValue(i)
+            QApplication.processEvents()
 
 class LoadImageWindow(QDialog):
     """
@@ -151,8 +159,6 @@ class MainWindow(QMainWindow):
             detect_trails.setStatusTip("Click here to start detecting trails in your fits images")
             self.toolbar.addWidget(detect_trails)
 
-   # def loading_screen (self): 
-
     def show_new_window(self):
         dialog = LoadImageWindow()
         dialog.exec_()
@@ -186,11 +192,12 @@ class MainWindow(QMainWindow):
         self.setStatusBar(status)
 
     def show_loading_screen(self):
-        # shows loading screen (default is 24% idk why)
+        # shows loading screen
         self.loading_screen.show()
 
-        # for now it just shows the screen for 5 seconds
-        QTimer.singleShot(5000, self.loading_screen.close)
+        # update the progress bar, and close 2s after getting to 100%
+        self.loading_screen.progress()
+        QTimer.singleShot(2000, self.loading_screen.close)
 
 if __name__ == "__main__":
     app = QApplication([])
