@@ -16,7 +16,10 @@ from PyQt5.QtWidgets import (
     QDialog,
     QPushButton,
     QFileDialog, 
-    QSplashScreen
+    QSplashScreen,
+    QVBoxLayout,
+    QHBoxLayout,
+    QWidget
 )
 
 # global variable to show which state the toolbar is currently in
@@ -136,9 +139,37 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(image_label)
 
     def image_processing_state(self):
+        # Create the main (parent) layout
+        central_widget = QWidget()
+        main_layout = QVBoxLayout(central_widget)
+        #msg = QLabel("Loading…")
+        #msg.setAlignment(Qt.AlignCenter)
+        #main_layout.addWidget(msg)
+        #global fits_images
+        for image in fits_images:
+            msg = QPushButton(image)
+            main_layout.addWidget(msg)
+
+
+        # Create a child layout
+        child_layout = QHBoxLayout()
+        child_layout.addWidget(QPushButton("Button 1"))
+        child_layout.addWidget(QPushButton("Button 2"))
+
+        # Add the child layout to the main layout
+        main_layout.addLayout(child_layout)
+
+        # Add another widget directly to the main layout
+        #main_layout.addWidget(QPushButton("Separate Button"))
+
+        #central_widget.setMinimumSize(300, 200)
+        self.setCentralWidget(central_widget)
+        #self.centralWidget().update()
+        #self.update()
+
         # update the central widget after the user uploads their images
         print("Central Widget Image:" + fits_images[0])
-        self.display_images(fits_images[0])
+        #self.display_images(fits_images[0])
 
         # update the toolbar after the user uploads their images
         if self.toolbar:
@@ -148,16 +179,22 @@ class MainWindow(QMainWindow):
 
             # previous button that will clear the toolbar and send you back to the original page
             prev_button = QPushButton("Previous")
-            direction = "backwards"
-            prev_button.clicked.connect(lambda: self.show_new_toolbar_image_processing(direction))
+            #direction = "backwards"
+            #prev_button.clicked.connect(lambda: self.show_new_toolbar_image_processing("backwards"))
+            prev_button.clicked.connect(self.show_new_toolbar_main)
             self.toolbar.addWidget(prev_button)
-            prev_button.setStatusTip("Click here to go back to the previous state (the Main Window)!")
+            prev_button.setStatusTip("Click here to go back to the Main Window.")
             
             # upon selecting detect trails it shows the users the loading screen 
             detect_trails = QPushButton("Detect Trails")
             detect_trails.clicked.connect(self.show_loading_screen)
-            detect_trails.setStatusTip("Click here to start detecting trails in your fits images")
+            detect_trails.setStatusTip("Click here to start detecting trails in your fits images.")
             self.toolbar.addWidget(detect_trails)
+
+            # after clicking save, it will save the new images for the user 
+            save_button = QPushButton("Save")
+            save_button.setStatusTip("Click here to save your new fits images.")
+            self.toolbar.addWidget(save_button)
 
     def show_new_window(self):
         dialog = LoadImageWindow()
@@ -169,6 +206,13 @@ class MainWindow(QMainWindow):
         if current_state == "Main_Window":
             self.image_processing_state()
             current_state = "Image_Processing"
+        elif current_state == "Image_Processing":
+            toolbar = self.findChild(QToolBar)
+            #if direction == "forward":
+            for widget in toolbar.actions():
+                toolbar.removeAction(widget)
+            self.main_state()
+            current_state = "Main_Window"
 
     def show_new_toolbar_image_processing(self, direction):
         global current_state
