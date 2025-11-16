@@ -142,14 +142,12 @@ class MainWindow(QMainWindow):
         # Create the main (parent) layout
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
-        #msg = QLabel("Loading…")
-        #msg.setAlignment(Qt.AlignCenter)
-        #main_layout.addWidget(msg)
+        
+        # add a button for each image
         #global fits_images
         for image in fits_images:
             msg = QPushButton(image)
             main_layout.addWidget(msg)
-
 
         # Create a child layout
         child_layout = QHBoxLayout()
@@ -159,13 +157,8 @@ class MainWindow(QMainWindow):
         # Add the child layout to the main layout
         main_layout.addLayout(child_layout)
 
-        # Add another widget directly to the main layout
-        #main_layout.addWidget(QPushButton("Separate Button"))
-
-        #central_widget.setMinimumSize(300, 200)
+        # set the whole layout as the central widget
         self.setCentralWidget(central_widget)
-        #self.centralWidget().update()
-        #self.update()
 
         # update the central widget after the user uploads their images
         print("Central Widget Image:" + fits_images[0])
