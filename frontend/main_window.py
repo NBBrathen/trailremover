@@ -1,12 +1,18 @@
 import os
 import sys
 
+# imports for collecting fits images
 from pathlib import Path
 import time
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt, QTimer
+
+# imports for formatting fits images
+from astropy.io import fits
+import numpy as np
+
+# imports for GUI features
+from PyQt5.QtCore import Qt, QTimer, QRect
 from PyQt5.uic import loadUi
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -19,7 +25,8 @@ from PyQt5.QtWidgets import (
     QSplashScreen,
     QVBoxLayout,
     QHBoxLayout,
-    QWidget
+    QWidget,
+    QScrollArea
 )
 
 # global variable to show which state the toolbar is currently in
@@ -123,46 +130,80 @@ class MainWindow(QMainWindow):
         # add the toolbar itself!
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.toolbar)
 
-    def display_images(self, file_path):
-        # TODO: upload MULTIPLE files
-        # TODO: change fits images to an appropriate format?
+    def display_image(self, file_path):
+        # TODO: fits images dont display as viewed in other software?
+        # read the file that the user uploaded
+        hdul = fits.open(file_path)
+        data = hdul[0].data
+        hdul.close()
 
-        # get the file that the user uploaded
-        pixmap = QPixmap(file_path)
+        data_norm = (data - np.min(data)) / (np.max(data) - np.min(data))
+        data_8bit = (data_norm * 255).astype(np.uint8)
+
+        # get width & height and scale down
+        height, width = data_8bit.shape
+        width /= 6
+        height /= 6
+
+        # transform QImage to QPixmap
+        q_image = QImage(data_8bit.tobytes(), int(width), int(height), QImage.Format_Grayscale8)
+        pixmap = QPixmap.fromImage(q_image)
 
         #turn the pixmap into a label
         image_label = QLabel()
         image_label.setPixmap(pixmap)
         image_label.setAlignment(Qt.AlignCenter)
 
-        # update the central widget
-        self.setCentralWidget(image_label)
+        # TODO: only the first clicked button will update the widget... fix that
+        # update the widgets
+        original_item = self.child_layout.takeAt(0)
+        if original_item is not None:
+            original_widget = original_item.widget()
+            if original_widget is not None:
+                # remove it from the layout
+                self.child_layout.removeWidget(original_widget)
+                original_widget.deleteLater() 
+            del original_item # delete the old layout item
+
+        # insert the new image
+        self.child_layout.insertWidget(0, image_label)
+
+        #TODO: also insert the 2nd image after detecting trails
 
     def image_processing_state(self):
-        # Create the main (parent) layout
+        # Create the main (parent) layout & add scroll area
         central_widget = QWidget()
-        main_layout = QVBoxLayout(central_widget)
+        self.main_layout = QVBoxLayout(central_widget)
+        self.scroll_area = QScrollArea()
+        self.main_layout.addWidget(self.scroll_area)
         
+        self.scrollAreaContent = QWidget()
+        # TODO: last parameter (932) is giving troubles
+        self.scrollAreaContent.setGeometry(QRect(0, 0, 1225, 932))
+        self.scroll_area.setWidget(self.scrollAreaContent)
+
+        # Create child layouts
+        self.scroll_layout = QVBoxLayout(self.scrollAreaContent)
+        self.child_layout = QHBoxLayout()
+
         # add a button for each image
         #global fits_images
         for image in fits_images:
-            msg = QPushButton(image)
-            main_layout.addWidget(msg)
+            image_button = QPushButton(image + "\t Trails Detected: ")
+            # update the central widget after the user uploads their images
+            image_button.clicked.connect(lambda: self.display_image(image))
+            image_button.setStatusTip("Click here display the selected image.")
+            self.scroll_layout.addWidget(image_button)
+            #self.main_layout.addWidget(image_button)
 
-        # Create a child layout
-        child_layout = QHBoxLayout()
-        child_layout.addWidget(QPushButton("Button 1"))
-        child_layout.addWidget(QPushButton("Button 2"))
+        self.child_layout.addWidget(QLabel("Original Image"))
+        self.child_layout.addWidget(QLabel("New Image"))
 
         # Add the child layout to the main layout
-        main_layout.addLayout(child_layout)
+        self.main_layout.addLayout(self.child_layout)
 
         # set the whole layout as the central widget
         self.setCentralWidget(central_widget)
-
-        # update the central widget after the user uploads their images
-        print("Central Widget Image:" + fits_images[0])
-        #self.display_images(fits_images[0])
 
         # update the toolbar after the user uploads their images
         if self.toolbar:
@@ -172,17 +213,9 @@ class MainWindow(QMainWindow):
 
             # previous button that will clear the toolbar and send you back to the original page
             prev_button = QPushButton("Previous")
-            #direction = "backwards"
-            #prev_button.clicked.connect(lambda: self.show_new_toolbar_image_processing("backwards"))
             prev_button.clicked.connect(self.show_new_toolbar_main)
             self.toolbar.addWidget(prev_button)
             prev_button.setStatusTip("Click here to go back to the Main Window.")
-            
-            # upon selecting detect trails it shows the users the loading screen 
-            detect_trails = QPushButton("Detect Trails")
-            detect_trails.clicked.connect(self.show_loading_screen)
-            detect_trails.setStatusTip("Click here to start detecting trails in your fits images.")
-            self.toolbar.addWidget(detect_trails)
 
             # after clicking save, it will save the new images for the user 
             save_button = QPushButton("Save")
@@ -197,31 +230,20 @@ class MainWindow(QMainWindow):
     def show_new_toolbar_main(self):
         global current_state
         if current_state == "Main_Window":
+            # change state
             self.image_processing_state()
             current_state = "Image_Processing"
+
+            # pop up loading screen after uploading images
+            self.show_loading_screen()
+
         elif current_state == "Image_Processing":
             toolbar = self.findChild(QToolBar)
-            #if direction == "forward":
+            # reset toolbar and central widget back to main state
             for widget in toolbar.actions():
                 toolbar.removeAction(widget)
             self.main_state()
             current_state = "Main_Window"
-
-    def show_new_toolbar_image_processing(self, direction):
-        global current_state
-        if current_state == "Image_Processing":
-            toolbar = self.findChild(QToolBar)
-            if direction == "forward":
-                for widget in toolbar.actions():
-                    toolbar.removeAction(widget)
-                #self.detection_state()
-                current_state = "Detection"
-            elif direction == "backwards": # should be an else statement?
-                for widget in toolbar.actions():
-                    toolbar.removeAction(widget)
-                self.main_state()
-                current_state = "Main_Window"
-                
 
     def _createStatusBar(self):
         # default status is blank: ""
