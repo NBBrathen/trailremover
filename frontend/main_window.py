@@ -179,7 +179,8 @@ class MainWindow(QMainWindow):
         
         self.scrollAreaContent = QWidget()
         # TODO: last parameter (932) is giving troubles
-        self.scrollAreaContent.setGeometry(QRect(0, 0, 1225, 932))
+        self.scroll_area.setWidgetResizable(True)
+        #self.scrollAreaContent.setGeometry(QRect(0, 0, 1225, 932))
         self.scroll_area.setWidget(self.scrollAreaContent)
 
         # Create child layouts
@@ -189,7 +190,8 @@ class MainWindow(QMainWindow):
         # add a button for each image
         #global fits_images
         for image in fits_images:
-            image_button = QPushButton(image + "\t Trails Detected: ")
+            image_button = QPushButton(image + "           Trails Detected: 0")
+            image_button.setStyleSheet("text-align: left;") 
             # update the central widget after the user uploads their images
             image_button.clicked.connect(lambda: self.display_image(image))
             image_button.setStatusTip("Click here display the selected image.")
@@ -254,9 +256,9 @@ class MainWindow(QMainWindow):
         # shows loading screen
         self.loading_screen.show()
 
-        # update the progress bar, and close 2s after getting to 100%
+        # update the progress bar, and close 0.5s after getting to 100%
         self.loading_screen.progress()
-        QTimer.singleShot(2000, self.loading_screen.close)
+        QTimer.singleShot(500, self.loading_screen.close)
 
 if __name__ == "__main__":
     app = QApplication([])
