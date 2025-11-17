@@ -7,6 +7,8 @@ import time
 
 # imports for formatting fits images
 from astropy.io import fits
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 # imports for GUI features
@@ -134,19 +136,26 @@ class MainWindow(QMainWindow):
         # TODO: fits images dont display as viewed in other software?
         # read the file that the user uploaded
         hdul = fits.open(file_path)
-        data = hdul[0].data
+        data = hdul[0].data.astype(np.float32)
         hdul.close()
 
-        data_norm = (data - np.min(data)) / (np.max(data) - np.min(data))
+        low = np.percentile(data, 1)
+        high = np.percentile(data, 99)
+        data = np.clip(data, low, high)
+
+        data_norm = (data - low) / (high - low)
         data_8bit = (data_norm * 255).astype(np.uint8)
 
         # get width & height and scale down
         height, width = data_8bit.shape
-        width /= 6
-        height /= 6
+        new_width = width // 6
+        new_height = height // 6
+        data_scaled = cv2.resize(data_8bit, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+        bytes_per_line = new_width
 
         # transform QImage to QPixmap
-        q_image = QImage(data_8bit.tobytes(), int(width), int(height), QImage.Format_Grayscale8)
+        q_image = QImage(data_scaled.data, new_width, new_height, bytes_per_line, QImage.Format_Grayscale8)
         pixmap = QPixmap.fromImage(q_image)
 
         #turn the pixmap into a label
@@ -157,12 +166,12 @@ class MainWindow(QMainWindow):
         # TODO: only the first clicked button will update the widget... fix that
         # update the widgets
         original_item = self.child_layout.takeAt(0)
-        if original_item is not None:
-            original_widget = original_item.widget()
-            if original_widget is not None:
+        if original_item:
+            widget = original_item.widget()
+            if widget:
                 # remove it from the layout
-                self.child_layout.removeWidget(original_widget)
-                original_widget.deleteLater() 
+                self.child_layout.removeWidget(widget)
+                widget.deleteLater() 
             del original_item # delete the old layout item
 
         # insert the new image
@@ -178,7 +187,6 @@ class MainWindow(QMainWindow):
         self.main_layout.addWidget(self.scroll_area)
         
         self.scrollAreaContent = QWidget()
-        # TODO: last parameter (932) is giving troubles
         self.scroll_area.setWidgetResizable(True)
         #self.scrollAreaContent.setGeometry(QRect(0, 0, 1225, 932))
         self.scroll_area.setWidget(self.scrollAreaContent)
@@ -193,7 +201,8 @@ class MainWindow(QMainWindow):
             image_button = QPushButton(image + "           Trails Detected: 0")
             image_button.setStyleSheet("text-align: left;") 
             # update the central widget after the user uploads their images
-            image_button.clicked.connect(lambda: self.display_image(image))
+            image_button.clicked.connect(lambda checked, current_image=image: self.display_image(current_image))
+            #image_button.clicked.connect(lambda: self.display_image(image))
             image_button.setStatusTip("Click here display the selected image.")
             self.scroll_layout.addWidget(image_button)
             #self.main_layout.addWidget(image_button)
