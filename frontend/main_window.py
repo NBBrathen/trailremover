@@ -1,5 +1,6 @@
 import os
 import sys
+from api_client import TrailRemoverAPIClient
 
 # imports for collecting fits images
 from pathlib import Path
@@ -86,8 +87,8 @@ class LoadImageWindow(QDialog):
                     fits_images.append(os.path.join(root, file))
         
         # temporary print to show all images in fits_images
-        for image in fits_images:
-            print(image)
+        #for image in fits_images:
+        #    print(image)
 
         
 class MainWindow(QMainWindow):
@@ -107,6 +108,9 @@ class MainWindow(QMainWindow):
         self.main_state()
         self._createStatusBar()
         self.loading_screen = LoadingScreen()
+
+        # create a client for the instance
+        self.client = TrailRemoverAPIClient()
 
     #def _createMenu(self):
         #menu = self.menuBar().addMenu("&Menu")
@@ -133,7 +137,6 @@ class MainWindow(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.BottomToolBarArea, self.toolbar)
 
     def display_image(self, file_path):
-        # TODO: fits images dont display as viewed in other software?
         # read the file that the user uploaded
         hdul = fits.open(file_path)
         data = hdul[0].data.astype(np.float32)
@@ -146,12 +149,11 @@ class MainWindow(QMainWindow):
         data_norm = (data - low) / (high - low)
         data_8bit = (data_norm * 255).astype(np.uint8)
 
-        # get width & height and scale down
+        # scale down image
         height, width = data_8bit.shape
         new_width = width // 6
         new_height = height // 6
         data_scaled = cv2.resize(data_8bit, (new_width, new_height), interpolation=cv2.INTER_AREA)
-
         bytes_per_line = new_width
 
         # transform QImage to QPixmap
@@ -163,7 +165,6 @@ class MainWindow(QMainWindow):
         image_label.setPixmap(pixmap)
         image_label.setAlignment(Qt.AlignCenter)
 
-        # TODO: only the first clicked button will update the widget... fix that
         # update the widgets
         original_item = self.child_layout.takeAt(0)
         if original_item:
@@ -188,7 +189,6 @@ class MainWindow(QMainWindow):
         
         self.scrollAreaContent = QWidget()
         self.scroll_area.setWidgetResizable(True)
-        #self.scrollAreaContent.setGeometry(QRect(0, 0, 1225, 932))
         self.scroll_area.setWidget(self.scrollAreaContent)
 
         # Create child layouts
@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
         # add a button for each image
         #global fits_images
         for image in fits_images:
-            image_button = QPushButton(image + "           Trails Detected: 0")
+            image_button = QPushButton(image + "\t\t\t\t\t Trails Detected: 0")
             image_button.setStyleSheet("text-align: left;") 
             # update the central widget after the user uploads their images
             image_button.clicked.connect(lambda checked, current_image=image: self.display_image(current_image))
@@ -210,10 +210,8 @@ class MainWindow(QMainWindow):
         self.child_layout.addWidget(QLabel("Original Image"))
         self.child_layout.addWidget(QLabel("New Image"))
 
-        # Add the child layout to the main layout
-        self.main_layout.addLayout(self.child_layout)
-
         # set the whole layout as the central widget
+        self.main_layout.addLayout(self.child_layout)
         self.setCentralWidget(central_widget)
 
         # update the toolbar after the user uploads their images
@@ -237,6 +235,16 @@ class MainWindow(QMainWindow):
         dialog = LoadImageWindow()
         dialog.exec_()
         self.show_new_toolbar_main()
+        for image in fits_images:
+            image_path = Path(image)
+            string = self.client.upload_image(image_path)
+            #print("New String: " + string)
+            dict = self.client.get_job_status(string)
+            # Print key-value pairs
+            print("Key-Value Pairs:")
+            for key, value in dict.items():
+                print("\n")
+                print(f"{key}: {value}")
 
     def show_new_toolbar_main(self):
         global current_state
