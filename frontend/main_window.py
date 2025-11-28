@@ -57,37 +57,48 @@ class LoadingScreen(QSplashScreen):
         self.timer.start(100) # check 10 times a second
 
     def check_jobs(self):
-        completed_jobs = 0
+        try:
+            completed_jobs = 0
 
-        for job_id in self.jobs_to_check:
-            status = self.client.get_job_status(job_id)
-            if status is None: # fetch failed
-                continue
+            for job_id in self.jobs_to_check:
+                try:
+                    status = self.client.get_job_status(job_id)
+                except Exception as e:
+                    print(f"API error getting status for job {job_id}: {e}")
+                    continue
 
-            backend_status = status.get("status")
-            print(f"Job {job_id}: status='{backend_status}'")
+                backend_status = status.get("status")
+                print(f"Job {job_id}: status='{backend_status}'")
 
-            # if images are still awaiting review, force corrections
-            if backend_status == "AWAITING_REVIEW":
-                detections = self.client.get_detections(job_id)
-                if detections and "trails" in detections:
+                # if images are still awaiting review, force corrections
+                if backend_status == "AWAITING_REVIEW":
+                    try:
+                        detections = self.client.get_detections(job_id)
+                    except Exception as e:
+                        print(f"Detection fetch failed for job {job_id}: {e}")
+                        detections = None
                     trail_ids = [trail["trail_id"] for trail in detections["trails"]]
                     self.client.submit_corrections(job_id, trail_ids)
+                if backend_status == "DONE":
+                    completed_jobs += 1
 
+                # compute average progress safely
+                try:
+                    progress = int((completed_jobs / len(self.jobs_to_check)) * 100) if self.jobs_to_check else 0
+                except ZeroDivisionError:
+                    print("Warning: No images uploaded to process.")
+                    progress = 0
 
-            if backend_status == "DONE":
-                completed_jobs += 1
+                self.progressBar.setValue(progress)
+                QApplication.processEvents()
 
-        # compute average progress across all jobs
-        progress = int((completed_jobs / len(self.jobs_to_check)) * 100)
-        self.progressBar.setValue(progress)
-        QApplication.processEvents()
-
-        # once all jobs are completed or failed, stop timer and close
-        if completed_jobs == len(self.jobs_to_check):
-            self.timer.stop()
-            self.close()
-            print("All jobs completed!")
+            # once all jobs are completed, stop timer and close
+            if completed_jobs == len(self.jobs_to_check):
+                self.timer.stop()
+                self.close()
+                print("All jobs completed!")
+        except Exception as e:
+            print(f"Unexpected error in loading screen: {e}")
 
 
 class LoadImageWindow(QDialog):
@@ -199,10 +210,14 @@ class MainWindow(QMainWindow):
         info = self.image_data[job_id]
         file_path = info["original_path"]
 
-        # read the file that the user uploaded
-        hdul = fits.open(file_path)
-        data = hdul[0].data.astype(np.float32)
-        hdul.close()
+        try:
+            # read the file that the user uploaded
+            hdul = fits.open(file_path)
+            data = hdul[0].data.astype(np.float32)
+            hdul.close()
+        except Exception as e:
+            print(f"Error reading FITS file: {file_path} -> {e}")
+            return
 
         low = np.percentile(data, 1)
         high = np.percentile(data, 99)
