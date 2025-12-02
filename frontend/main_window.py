@@ -156,6 +156,12 @@ class LoadImageWindow(QDialog):
             image_path = Path(image)
             # get job id & status from backend
             job_id = self.parent_window.client.upload_image(image_path)
+
+            # Skip if upload failed
+            if job_id is None:
+                print(f"Failed to upload {image_path}, skipping...")
+                continue
+
             status = self.parent_window.client.get_job_status(job_id)
             self.parent_window.image_data[job_id] = {
                 "original_path": image_path,
@@ -164,8 +170,9 @@ class LoadImageWindow(QDialog):
             #add the job to the list
             job_ids.append(job_id)
 
-        # show the loading bar while waiting for the jobs to complete
-        self.parent_window.loading_screen.start(self.parent_window.client, job_ids, self.parent_window)
+        # Only start loading screen if we have jobs
+        if job_ids:
+            self.parent_window.loading_screen.start(self.parent_window.client, job_ids, self.parent_window)
 
         self.close()
 
