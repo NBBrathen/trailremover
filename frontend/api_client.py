@@ -37,7 +37,7 @@ class TrailRemoverAPIClient:
                 response = requests.post(
                     f"{self.api_base}/images/upload",
                     files=files,
-                    timeout=30
+                    timeout=120
                 )
 
             if response.status_code == 200:
@@ -60,7 +60,7 @@ class TrailRemoverAPIClient:
         try:
             response = requests.get(
                 f"{self.api_base}/jobs/{job_id}",
-                timeout=10
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -80,7 +80,7 @@ class TrailRemoverAPIClient:
         try:
             response = requests.get(
                 f"{self.api_base}/jobs/{job_id}/detections",
-                timeout=10
+                timeout=30
             )
 
             if response.status_code == 200:
