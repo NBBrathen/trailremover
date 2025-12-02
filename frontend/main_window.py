@@ -46,12 +46,14 @@ class LoadingScreen(QSplashScreen):
         self.progressBar.setValue(0)
         self.jobs_to_check = []
         self.client = None
+        self.main_window = None
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_jobs)
 
-    def start(self, client, job_ids):
+    def start(self, client, job_ids, main_window):
         self.client = client
         self.jobs_to_check = job_ids
+        self.main_window = main_window
         self.progressBar.setValue(0)
         self.show()
         self.timer.start(100) # check 10 times a second
@@ -77,8 +79,13 @@ class LoadingScreen(QSplashScreen):
                     except Exception as e:
                         print(f"Detection fetch failed for job {job_id}: {e}")
                         detections = None
-                    trail_ids = [trail["trail_id"] for trail in detections["trails"]]
-                    self.client.submit_corrections(job_id, trail_ids)
+
+                    if detections:
+                        # Store the trail count in image_data
+                        self.main_window.image_data[job_id]["trail_count"] = detections.get("trail_count", 0)
+                        trail_ids = [trail["trail_id"] for trail in detections["trails"]]
+                        self.client.submit_corrections(job_id, trail_ids)
+
                 if backend_status == "DONE":
                     completed_jobs += 1
 
@@ -97,6 +104,7 @@ class LoadingScreen(QSplashScreen):
                 self.timer.stop()
                 self.close()
                 print("All jobs completed!")
+                self.main_window.image_processing_state()
         except Exception as e:
             print(f"Unexpected error in loading screen: {e}")
 
@@ -156,8 +164,8 @@ class LoadImageWindow(QDialog):
             #add the job to the list
             job_ids.append(job_id)
 
-        # show the loading bar while waiting for the jobs to compelete
-        self.parent_window.loading_screen.start(self.parent_window.client, job_ids)
+        # show the loading bar while waiting for the jobs to complete
+        self.parent_window.loading_screen.start(self.parent_window.client, job_ids, self.parent_window)
 
         self.close()
 
@@ -258,7 +266,7 @@ class MainWindow(QMainWindow):
                 high = np.percentile(data, 99)
                 data = np.clip(data, low, high)
 
-                plt.imshow(data, cmap='gray', origin='lower')
+                plt.imshow(data, cmap='gray') # Having origin='lower' flips the image
                 plt.axis('off')
                 plt.savefig(processed_png_path, bbox_inches='tight', pad_inches=0)
                 plt.close()
@@ -314,7 +322,7 @@ class MainWindow(QMainWindow):
         #global fits_images
         for job_id, info in self.image_data.items():
             original_path = info["original_path"]
-            trail_count = info["status"].get("trail_count", 0)  # default 0 if missing
+            trail_count = info.get("trail_count", 0)  # Get from image_data, not status
 
             # Build the button text
             button_text = f"{original_path}\t\t\t\t\t Trails Detected: {trail_count}"
@@ -384,7 +392,7 @@ class MainWindow(QMainWindow):
         # shows loading screen
         self.loading_screen.show()
 
-        self.loading_screen.start(self.client, list(self.image_data.keys()))
+        self.loading_screen.start(self.client, list(self.image_data.keys()), self)
         # update the progress bar, and close 0.5s after getting to 100%
         #self.loading_screen.progress()
         #QTimer.singleShot(500, self.loading_screen.close)
