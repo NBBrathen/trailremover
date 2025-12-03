@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # imports for GUI features
-from PyQt5.QtCore import Qt, QTimer, QRect
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt5.uic import loadUi
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (
@@ -32,81 +32,79 @@ from PyQt5.QtWidgets import (
     QScrollArea
 )
 
+
 # global variable to show which state the toolbar is currently in
 current_state = "Main_Window"
 # global variable to hold all the images from the folder the user inputs
 fits_images = []
 
+
+class UploadAndDetectThread(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal()
+
+    def __init__(self, client, image_paths, main_window):
+        super().__init__()
+        self.client = client
+        self.image_paths = image_paths
+        self.main_window = main_window
+
+    def run(self):
+        total_images = len(self.image_paths)
+        job_ids = []
+
+        for idx, path in enumerate(self.image_paths, 1):
+            job_id = self.client.upload_image(Path(path))
+            if job_id:
+                status = self.client.get_job_status(job_id)
+                self.main_window.image_data[job_id] = {
+                    "original_path": Path(path),
+                    "status": status
+                }
+                job_ids.append(job_id)
+
+                # wait until status is DONE
+                while True:
+                    status = self.client.get_job_status(job_id)
+                    backend_status = status.get("status")
+                    if backend_status == "AWAITING_REVIEW":
+                        detections = self.client.get_detections(job_id)
+                        if detections:
+                            self.main_window.image_data[job_id]["trail_count"] = detections.get("trail_count", 0)
+                            trail_ids = [t["trail_id"] for t in detections["trails"]]
+                            self.client.submit_corrections(job_id, trail_ids)
+                    if backend_status == "DONE":
+                        break
+
+            # emit progress
+            percent = int((idx / total_images) * 100)
+            self.progress.emit(percent)
+
+        self.finished.emit()
+
+
 class LoadingScreen(QSplashScreen):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowFlag(Qt.WindowStaysOnTopHint) # necessary?
         ui_path = Path(__file__).parent / "loading_screen.ui"
         loadUi(str(ui_path), self)
 
         self.progressBar.setValue(0)
-        self.jobs_to_check = []
-        self.client = None
         self.main_window = None
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_jobs)
 
-    def start(self, client, job_ids, main_window):
-        self.client = client
-        self.jobs_to_check = job_ids
+    def start(self, main_window, worker_thread):
         self.main_window = main_window
-        self.progressBar.setValue(0)
         self.show()
-        self.timer.start(100) # check 10 times a second
+        QApplication.processEvents()
 
-    def check_jobs(self):
-        try:
-            completed_jobs = 0
+        worker_thread.progress.connect(self.progressBar.setValue)
+        worker_thread.finished.connect(self.done)
 
-            for job_id in self.jobs_to_check:
-                try:
-                    status = self.client.get_job_status(job_id)
-                except Exception as e:
-                    print(f"API error getting status for job {job_id}: {e}")
-                    continue
-
-                backend_status = status.get("status")
-                print(f"Job {job_id}: status='{backend_status}'")
-
-                # if images are still awaiting review, force corrections
-                if backend_status == "AWAITING_REVIEW":
-                    try:
-                        detections = self.client.get_detections(job_id)
-                    except Exception as e:
-                        print(f"Detection fetch failed for job {job_id}: {e}")
-                        detections = None
-
-                    if detections:
-                        # Store the trail count in image_data
-                        self.main_window.image_data[job_id]["trail_count"] = detections.get("trail_count", 0)
-                        trail_ids = [trail["trail_id"] for trail in detections["trails"]]
-                        self.client.submit_corrections(job_id, trail_ids)
-
-                if backend_status == "DONE":
-                    completed_jobs += 1
-
-                # compute average progress safely
-                try:
-                    progress = int((completed_jobs / len(self.jobs_to_check)) * 100) if self.jobs_to_check else 0
-                except ZeroDivisionError:
-                    print("Warning: No images uploaded to process.")
-                    progress = 0
-
-                self.progressBar.setValue(progress)
-                QApplication.processEvents()
-
-            # once all jobs are completed, stop timer and close
-            if completed_jobs == len(self.jobs_to_check):
-                self.timer.stop()
-                self.close()
-                print("All jobs completed!")
-                self.main_window.image_processing_state()
-        except Exception as e:
-            print(f"Unexpected error in loading screen: {e}")
+    def done(self):
+        self.close()
+        print("All jobs completed!")
+        self.main_window.image_processing_state() 
 
 
 class LoadImageWindow(QDialog):
@@ -149,34 +147,17 @@ class LoadImageWindow(QDialog):
             print("No images selected.")
             return
         
-        # store all jobs
-        job_ids = []
-
-        for image in fits_images:
-            image_path = Path(image)
-            # get job id & status from backend
-            job_id = self.parent_window.client.upload_image(image_path)
-
-            # Skip if upload failed
-            if job_id is None:
-                print(f"Failed to upload {image_path}, skipping...")
-                continue
-
-            status = self.parent_window.client.get_job_status(job_id)
-            self.parent_window.image_data[job_id] = {
-                "original_path": image_path,
-                "status": status
-            }
-            #add the job to the list
-            job_ids.append(job_id)
-
-        # Only start loading screen if we have jobs
-        if job_ids:
-            self.parent_window.loading_screen.start(self.parent_window.client, job_ids, self.parent_window)
-
         self.close()
 
-        
+        self.parent_window.loading_screen.show()
+        QApplication.processEvents()
+
+        # start combined thread
+        self.worker_thread = UploadAndDetectThread(self.parent_window.client, fits_images, self.parent_window)
+        self.parent_window.loading_screen.start(self.parent_window, self.worker_thread)
+        self.worker_thread.start()  
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -380,7 +361,7 @@ class MainWindow(QMainWindow):
             current_state = "Image_Processing"
 
             # pop up loading screen after uploading images
-            self.show_loading_screen()
+            #self.show_loading_screen()
 
         elif current_state == "Image_Processing":
             toolbar = self.findChild(QToolBar)
