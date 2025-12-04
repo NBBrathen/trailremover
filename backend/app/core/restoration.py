@@ -13,388 +13,144 @@ import cv2
 logger = logging.getLogger(__name__)
 
 
-def restore_pixels(
-    image_data: np.ndarray,
-    trails: List[Dict[str, Any]],
-    method: str = 'telea',
-    inpaint_radius: int = 30
+def restore_pixels_local_background(
+        image_data: np.ndarray,
+        trails: List[Dict[str, Any]],
+        sample_radius: int = 30,
+        expand_mask: int = 5
 ) -> np.ndarray:
     """
-    Restore pixels where satellite trails have been detected.
+    Restore trail pixels using local background estimation with noise matching.
 
-    Uses inpainting algorithms to fill in trail regions based on
-    surrounding pixel values.
-
-    Args:
-        image_data: Original FITS image data (H, W)
-        trails: List of detected trails with 'mask' key containing binary masks
-        method: Inpainting method - 'telea', 'ns', or 'biharmonic'
-        inpaint_radius: Radius around each pixel to consider for inpainting
-
-    Returns:
-        Restored image with trails removed
-
-    Methods:
-        - 'telea': Fast Marching Method (Telea 2004) - Fast, good for thin features
-        - 'ns': Navier-Stokes based (Bertalmio 2001) - Slower, better for larger regions
-        - 'biharmonic': Biharmonic equation - Smooth, works well for astronomy
+    1. Expand trail mask slightly to catch edges
+    2. For each trail pixel, sample nearby non-trail pixels
+    3. Estimate local background (median) and noise (std)
+    4. Replace trail pixel with background + matched Gaussian noise
     """
-    logger.info(f"Restoring pixels for {len(trails)} trail(s) using {method} method")
-
-    if len(trails) == 0:
-        logger.info("No trails to restore, returning original image")
-        return image_data.copy()
-
-    # Create combined mask from all trails
-    combined_mask = np.zeros(image_data.shape, dtype=np.uint8)
-
-    for trail in trails:
-        mask = trail.get('mask')
-        if mask is not None:
-            # Convert float mask to binary uint8
-            binary_mask = (mask > 0.1).astype(np.uint8) * 255
-            combined_mask = np.maximum(combined_mask, binary_mask)
-
-    trail_pixel_count = np.count_nonzero(combined_mask)
-    total_pixels = combined_mask.size
-    trail_percentage = (trail_pixel_count / total_pixels) * 100
-
-    logger.info(f"Restoring {trail_pixel_count:,} pixels ({trail_percentage:.3f}% of image)")
-
-    if trail_pixel_count == 0:
-        logger.warning("Combined mask is empty, returning original image")
-        return image_data.copy()
-
-    # Perform restoration
-    try:
-        if method == 'biharmonic':
-            restored = _restore_biharmonic(image_data, combined_mask)
-        elif method == 'ns':
-            restored = _restore_opencv_ns(image_data, combined_mask, inpaint_radius)
-        elif method == 'telea':
-            restored = _restore_opencv_telea(image_data, combined_mask, inpaint_radius)
-        else:
-            logger.warning(f"Unknown method '{method}', falling back to 'telea'")
-            restored = _restore_opencv_telea(image_data, combined_mask, inpaint_radius)
-
-        logger.info("Pixel restoration complete")
-        return restored
-
-    except Exception as e:
-        logger.error(f"Error during restoration: {e}", exc_info=True)
-        logger.warning("Returning original image due to restoration failure")
-        return image_data.copy()
-
-
-def restore_pixels_iterative(
-    image_data: np.ndarray,
-    trails: List[Dict[str, Any]],
-    method: str = 'telea',
-    inpaint_radius: int = 20,
-    expand_mask: int = 5,
-    iterations: int = 3
-) -> np.ndarray:
-    """
-    Restore pixels using multiple passes for better results on faint trails.
-
-    Each iteration:
-    1. Expands the mask slightly more than previous iteration
-    2. Runs inpainting on current image
-    3. Uses result as input for next iteration
-
-    This progressive approach works better for wide, faint trails.
-
-    Args:
-        image_data: Original FITS image data
-        trails: List of detected trails
-        method: Inpainting method ('telea', 'ns', 'biharmonic')
-        inpaint_radius: Radius for inpainting algorithm
-        expand_mask: Initial mask expansion in pixels
-        iterations: Number of restoration passes (2-5 recommended)
-
-    Returns:
-        Restored image
-    """
-    logger.info(f"Iterative restoration: {iterations} passes, method={method}, radius={inpaint_radius}")
-
-    if len(trails) == 0:
-        return image_data.copy()
-
-    current_image = image_data.copy()
-
-    for i in range(iterations):
-        logger.debug(f"Restoration pass {i+1}/{iterations}")
-
-        # Expand masks progressively for this iteration
-        trails_expanded = []
-        for trail in trails:
-            trail_copy = trail.copy()
-            mask = trail['mask']
-
-            # Progressive expansion: more on each iteration
-            expansion = expand_mask + (i * 2)
-
-            if expansion > 0:
-                binary = (mask > 0.1).astype(np.uint8) * 255
-                kernel = cv2.getStructuringElement(
-                    cv2.MORPH_ELLIPSE,
-                    (expansion*2+1, expansion*2+1)
-                )
-                expanded = cv2.dilate(binary, kernel, iterations=1)
-                trail_copy['mask'] = expanded.astype(np.float32) / 255.0
-
-            trails_expanded.append(trail_copy)
-
-        # Restore this iteration
-        current_image = restore_pixels(
-            current_image,
-            trails_expanded,
-            method=method,
-            inpaint_radius=inpaint_radius
-        )
-
-        logger.debug(f"Pass {i+1} complete (expansion={expansion}px)")
-
-    logger.info("Iterative restoration complete")
-    return current_image
-
-
-def _restore_opencv_telea(
-    image_data: np.ndarray,
-    mask: np.ndarray,
-    radius: int = 5
-) -> np.ndarray:
-    """
-    Restore using OpenCV's Telea inpainting algorithm.
-
-    Fast Marching Method - fast and works well for thin trails.
-    """
-    logger.debug(f"Using Telea inpainting with radius={radius}")
-
-    # Normalize to 8-bit for OpenCV
-    img_min, img_max = image_data.min(), image_data.max()
-    if img_max > img_min:
-        normalized = ((image_data - img_min) / (img_max - img_min) * 255).astype(np.uint8)
-    else:
-        normalized = np.zeros_like(image_data, dtype=np.uint8)
-
-    # Perform inpainting
-    inpainted = cv2.inpaint(normalized, mask, radius, cv2.INPAINT_TELEA)
-
-    # Convert back to original scale
-    if img_max > img_min:
-        restored = (inpainted.astype(np.float32) / 255.0) * (img_max - img_min) + img_min
-    else:
-        restored = image_data.copy()
-
-    return restored.astype(image_data.dtype)
-
-
-def _restore_opencv_ns(
-    image_data: np.ndarray,
-    mask: np.ndarray,
-    radius: int = 5
-) -> np.ndarray:
-    """
-    Restore using OpenCV's Navier-Stokes inpainting algorithm.
-
-    Fluid dynamics based method - better for larger regions.
-    """
-    logger.debug(f"Using Navier-Stokes inpainting with radius={radius}")
-
-    # Normalize to 8-bit for OpenCV
-    img_min, img_max = image_data.min(), image_data.max()
-    if img_max > img_min:
-        normalized = ((image_data - img_min) / (img_max - img_min) * 255).astype(np.uint8)
-    else:
-        normalized = np.zeros_like(image_data, dtype=np.uint8)
-
-    # Perform inpainting
-    inpainted = cv2.inpaint(normalized, mask, radius, cv2.INPAINT_NS)
-
-    # Convert back to original scale
-    if img_max > img_min:
-        restored = (inpainted.astype(np.float32) / 255.0) * (img_max - img_min) + img_min
-    else:
-        restored = image_data.copy()
-
-    return restored.astype(image_data.dtype)
-
-
-def _restore_biharmonic(
-    image_data: np.ndarray,
-    mask: np.ndarray
-) -> np.ndarray:
-    """
-    Restore using biharmonic inpainting (scikit-image).
-
-    Solves the biharmonic equation to smoothly interpolate missing regions.
-    Works very well for astronomical images.
-    """
-    try:
-        from skimage.restoration import inpaint
-
-        logger.debug("Using biharmonic inpainting")
-
-        # Convert mask to boolean
-        mask_bool = (mask > 0).astype(bool)
-
-        # Perform inpainting
-        restored = inpaint.inpaint_biharmonic(
-            image_data,
-            mask_bool,
-            channel_axis=None
-        )
-
-        return restored.astype(image_data.dtype)
-
-    except ImportError:
-        logger.warning("scikit-image not available, falling back to Telea method")
-        return _restore_opencv_telea(image_data, mask, radius=5)
-
-
-def restore_pixels_advanced(
-    image_data: np.ndarray,
-    trails: List[Dict[str, Any]],
-    expand_mask: int = 5,
-    blend_edges: bool = True
-) -> np.ndarray:
-    """
-    Advanced restoration with mask expansion and edge blending.
-
-    This method:
-    1. Expands trail masks to ensure complete removal
-    2. Performs inpainting with larger radius
-    3. Blends edges for smoother transitions
-
-    Args:
-        image_data: Original FITS image data
-        trails: List of detected trails
-        expand_mask: Pixels to expand mask by (helps remove trail edges)
-        blend_edges: Whether to blend the edges of inpainted regions
-
-    Returns:
-        Restored image
-    """
-    logger.info(f"Advanced restoration for {len(trails)} trail(s)")
+    logger.info(f"Restoring {len(trails)} trail(s) using local background method")
 
     if len(trails) == 0:
         return image_data.copy()
 
     # Create combined mask
     combined_mask = np.zeros(image_data.shape, dtype=np.uint8)
-
     for trail in trails:
         mask = trail.get('mask')
         if mask is not None:
             binary_mask = (mask > 0.1).astype(np.uint8) * 255
             combined_mask = np.maximum(combined_mask, binary_mask)
 
-    # Expand mask to ensure trail edges are captured
+    # Expand mask to catch trail edges
     if expand_mask > 0:
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (expand_mask*2+1, expand_mask*2+1))
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE,
+            (expand_mask * 2 + 1, expand_mask * 2 + 1)
+        )
         combined_mask = cv2.dilate(combined_mask, kernel, iterations=1)
-        logger.debug(f"Expanded mask by {expand_mask} pixels")
 
-    # Perform inpainting with larger radius for better results
-    restored = _restore_opencv_telea(image_data, combined_mask, radius=25)
+    mask_bool = combined_mask > 0
+    trail_pixel_count = np.count_nonzero(mask_bool)
 
-    # Optional: Blend edges for smoother transition
-    if blend_edges:
-        restored = _blend_inpainted_edges(image_data, restored, combined_mask)
+    if trail_pixel_count == 0:
+        return image_data.copy()
 
-    logger.info("Advanced restoration complete")
+    logger.info(f"Restoring {trail_pixel_count:,} pixels")
+
+    # Create output image
+    restored = image_data.copy()
+
+    # Get coordinates of trail pixels
+    trail_coords = np.where(mask_bool)
+
+    # Create a dilated mask for sampling (area around trail but not in trail)
+    sample_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (sample_radius * 2 + 1, sample_radius * 2 + 1)
+    )
+    sample_region = cv2.dilate(combined_mask, sample_kernel, iterations=1)
+    sample_mask = (sample_region > 0) & ~mask_bool  # Around trail but not in it
+
+    # Calculate global background statistics as fallback
+    background_pixels = image_data[~mask_bool]
+    global_median = np.median(background_pixels)
+    global_std = np.std(background_pixels)
+
+    # For efficiency, process in blocks
+    height, width = image_data.shape
+    block_size = 64
+
+    for by in range(0, height, block_size):
+        for bx in range(0, width, block_size):
+            # Get block bounds
+            by_end = min(by + block_size, height)
+            bx_end = min(bx + block_size, width)
+
+            # Check if any trail pixels in this block
+            block_mask = mask_bool[by:by_end, bx:bx_end]
+            if not np.any(block_mask):
+                continue
+
+            # Sample region around this block
+            sample_by = max(0, by - sample_radius)
+            sample_by_end = min(height, by_end + sample_radius)
+            sample_bx = max(0, bx - sample_radius)
+            sample_bx_end = min(width, bx_end + sample_radius)
+
+            # Get nearby non-trail pixels for statistics
+            region_mask = mask_bool[sample_by:sample_by_end, sample_bx:sample_bx_end]
+            region_data = image_data[sample_by:sample_by_end, sample_bx:sample_bx_end]
+
+            nearby_pixels = region_data[~region_mask]
+
+            if len(nearby_pixels) > 10:
+                local_median = np.median(nearby_pixels)
+                local_std = np.std(nearby_pixels)
+            else:
+                local_median = global_median
+                local_std = global_std
+
+            # Fill trail pixels in this block
+            block_trail_coords = np.where(block_mask)
+            num_pixels = len(block_trail_coords[0])
+
+            # Generate random noise matching local statistics
+            noise = np.random.normal(0, local_std, num_pixels)
+            fill_values = local_median + noise
+
+            # Apply to restored image
+            for i in range(num_pixels):
+                y = by + block_trail_coords[0][i]
+                x = bx + block_trail_coords[1][i]
+                restored[y, x] = fill_values[i]
+
+    logger.info("Local background restoration complete")
     return restored
 
 
-def _blend_inpainted_edges(
-    original: np.ndarray,
-    inpainted: np.ndarray,
-    mask: np.ndarray,
-    blend_width: int = 3
+def restore_pixels_local_background_iterative(
+        image_data: np.ndarray,
+        trails: List[Dict[str, Any]],
+        sample_radius: int = 40,
+        base_expand: int = 8,
+        passes: int = 3
 ) -> np.ndarray:
     """
-    Blend the edges between inpainted and original regions.
-
-    Creates a smooth transition to avoid sharp boundaries.
+    Multiple passes with increasing mask expansion.
+    Catches the faint trail halo that single pass misses.
     """
-    # Create a distance transform from the mask edges
-    mask_binary = (mask > 0).astype(np.uint8)
+    current = image_data.copy()
 
-    # Erode to get inner boundary
-    kernel = np.ones((blend_width*2+1, blend_width*2+1), np.uint8)
-    inner_mask = cv2.erode(mask_binary, kernel, iterations=1)
+    for i in range(passes):
+        # Each pass expands mask a bit more
+        expand = base_expand + (i * 4)  # 8, 12, 16
+        logger.info(f"Restoration pass {i + 1}/{passes}, expand={expand}px")
 
-    # Blend region is the difference
-    blend_region = mask_binary - inner_mask
+        current = restore_pixels_local_background(
+            current,
+            trails,
+            sample_radius=sample_radius,
+            expand_mask=expand
+        )
 
-    if blend_region.sum() == 0:
-        return inpainted
+    return current
 
-    # Create blend weights (0 to 1)
-    blend_weights = cv2.distanceTransform(blend_region, cv2.DIST_L2, 3)
-    if blend_weights.max() > 0:
-        blend_weights = blend_weights / blend_weights.max()
-
-    # Blend
-    result = original.copy()
-    blend_mask = blend_region > 0
-    result[blend_mask] = (
-        inpainted[blend_mask] * blend_weights[blend_mask] +
-        original[blend_mask] * (1 - blend_weights[blend_mask])
-    )
-
-    # Replace fully inpainted region
-    full_mask = mask_binary & ~blend_region
-    result[full_mask > 0] = inpainted[full_mask > 0]
-
-    return result
-
-
-def evaluate_restoration_quality(
-    original: np.ndarray,
-    restored: np.ndarray,
-    mask: np.ndarray
-) -> Dict[str, float]:
-    """
-    Evaluate the quality of restoration.
-
-    Computes metrics on the restored region to assess quality.
-
-    Returns:
-        Dictionary with quality metrics:
-        - mean_absolute_difference: MAD between original and restored (outside mask)
-        - restored_mean: Mean value in restored region
-        - restored_std: Standard deviation in restored region
-        - noise_ratio: Ratio of restored std to surrounding std
-    """
-    mask_bool = mask > 0
-
-    # Get surrounding region (dilate mask)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
-    surrounding_mask = cv2.dilate(mask.astype(np.uint8), kernel) > 0
-    surrounding_mask = surrounding_mask & ~mask_bool
-
-    # Metrics in surrounding region (unchanged)
-    surrounding_mean = original[surrounding_mask].mean()
-    surrounding_std = original[surrounding_mask].std()
-
-    # Metrics in restored region
-    restored_mean = restored[mask_bool].mean()
-    restored_std = restored[mask_bool].std()
-
-    # How different is restored from original in unchanged regions?
-    unchanged_mask = ~mask_bool
-    mad = np.abs(original[unchanged_mask] - restored[unchanged_mask]).mean()
-
-    # Noise ratio - restored should have similar noise to surroundings
-    noise_ratio = restored_std / surrounding_std if surrounding_std > 0 else 0
-
-    return {
-        'mean_absolute_difference': float(mad),
-        'restored_mean': float(restored_mean),
-        'restored_std': float(restored_std),
-        'surrounding_mean': float(surrounding_mean),
-        'surrounding_std': float(surrounding_std),
-        'noise_ratio': float(noise_ratio)
-    }
