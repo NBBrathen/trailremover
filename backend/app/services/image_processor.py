@@ -11,6 +11,8 @@ from astropy.io import fits
 
 from app.config import settings
 from app.core.restoration import restore_pixels_iterative
+from app.core.restoration import restore_pixels_local_background_iterative
+from app.core.restoration import restore_pixels_interpolate
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +82,12 @@ class ImageProcessor:
             return image_data.copy()
 
         try:
-            restored = restore_pixels_iterative(
+            restored = restore_pixels_local_background_iterative(
                 image_data,
                 trails,
-                method=settings.RESTORATION_METHOD,
-                inpaint_radius=settings.RESTORATION_RADIUS,
-                expand_mask=settings.RESTORATION_EXPAND_MASK,
-                iterations=settings.RESTORATION_ITERATIONS
+                sample_radius=30,
+                base_expand=8,
+                passes=3
             )
 
             logger.info("Restoration complete")
