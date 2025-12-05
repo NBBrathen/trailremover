@@ -5,6 +5,7 @@ from api_client import create_api_client
 # imports for collecting fits images
 from pathlib import Path
 import shutil
+import tempfile
 
 # imports for formatting fits images
 from astropy.io import fits
@@ -39,6 +40,7 @@ current_state = "Main_Window"
 fits_images = []
 # global variable to hold all the processed images
 processed_images = []
+processed_images.clear()
 
 
 class UploadAndDetectThread(QThread):
@@ -242,15 +244,17 @@ class MainWindow(QMainWindow):
 
         processed_image_label = None
         if "processed_png" not in info:
-            processed_path = Path(f"/tmp/{job_id}_processed.fits")
+            temp_dir = Path(tempfile.gettempdir())
+            processed_path = temp_dir / f"{job_id}_processed.fits"
+            print("Saving processed file to:", processed_path)
             success = self.client.download_result(job_id, processed_path)
+            print("Download success:", success)
             if success:
                 # add the image to the list
                 processed_images.append(processed_path)
                 
                 # convert from fits to png
-                processed_png_path = Path(f"/tmp/{job_id}_processed.png")
-
+                processed_png_path = temp_dir / f"{job_id}_processed.png"
                 hdul = fits.open(processed_path)
                 data = hdul[0].data.astype(np.float32)
                 hdul.close()
