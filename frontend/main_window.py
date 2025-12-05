@@ -4,7 +4,7 @@ from api_client import create_api_client
 
 # imports for collecting fits images
 from pathlib import Path
-import time
+import shutil
 
 # imports for formatting fits images
 from astropy.io import fits
@@ -37,6 +37,8 @@ from PyQt5.QtWidgets import (
 current_state = "Main_Window"
 # global variable to hold all the images from the folder the user inputs
 fits_images = []
+# global variable to hold all the processed images
+processed_images = []
 
 
 class UploadAndDetectThread(QThread):
@@ -243,9 +245,12 @@ class MainWindow(QMainWindow):
             processed_path = Path(f"/tmp/{job_id}_processed.fits")
             success = self.client.download_result(job_id, processed_path)
             if success:
-                processed_png_path = Path(f"/tmp/{job_id}_processed.png")
+                # add the image to the list
+                processed_images.append(processed_path)
                 
                 # convert from fits to png
+                processed_png_path = Path(f"/tmp/{job_id}_processed.png")
+
                 hdul = fits.open(processed_path)
                 data = hdul[0].data.astype(np.float32)
                 hdul.close()
@@ -307,7 +312,6 @@ class MainWindow(QMainWindow):
         self.child_layout = QHBoxLayout()
 
         # add a button for each image
-        #global fits_images
         for job_id, info in self.image_data.items():
             original_path = info["original_path"]
             trail_count = info.get("trail_count", 0)  # Get from image_data, not status
@@ -320,6 +324,8 @@ class MainWindow(QMainWindow):
             # Connect the button to display the image; pass job_id so you can access processed image later
             # update the central widget after the user uploads their images
             image_button.clicked.connect(lambda checked, current_job_id=job_id: self.display_image(current_job_id))
+
+            # TODO: try to move self.client.download_result (from self.display_images) to right here?
 
             image_button.setStatusTip("Click here to display the selected image.")
             self.scroll_layout.addWidget(image_button)
@@ -345,8 +351,29 @@ class MainWindow(QMainWindow):
 
             # after clicking save, it will save the new images for the user 
             save_button = QPushButton("Save")
+            save_button.clicked.connect(self.show_download_dialog)
             save_button.setStatusTip("Click here to save your new fits images.")
             self.toolbar.addWidget(save_button)
+
+    def show_download_dialog(self):
+        # open the user's home directory
+        dir = QFileDialog.getExistingDirectory(self, "Choose a Downnloads Folder", os.path.expanduser('~')) # self, browser name, default path can also be ""
+
+        if dir:
+            # If the user selected a path, proceed with download
+            for path in processed_images:
+                self.download_image(path, dir)
+        else:
+            print("Download cancelled by user.")
+
+    def download_image(self, fits_path, destination_path):
+        try:
+            final_path = os.path.join(destination_path, os.path.basename(fits_path))
+
+            shutil.copy2(fits_path, final_path)
+            print(f"File downloaded successfully to: {destination_path}")
+        except Exception as e:
+            print(f"Error downloading file: {e}")
 
     def show_new_window(self):
         dialog = LoadImageWindow(parent=self)
