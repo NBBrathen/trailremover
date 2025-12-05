@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # imports for GUI features
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.uic import loadUi
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtWidgets import (
@@ -349,7 +349,7 @@ class MainWindow(QMainWindow):
 
             # previous button that will clear the toolbar and send you back to the original page
             prev_button = QPushButton("Previous")
-            prev_button.clicked.connect(self.show_new_toolbar_main)
+            prev_button.clicked.connect(self.restore_previous_window)
             self.toolbar.addWidget(prev_button)
             prev_button.setStatusTip("Click here to go back to the Main Window.")
 
@@ -361,7 +361,7 @@ class MainWindow(QMainWindow):
 
     def show_download_dialog(self):
         # open the user's home directory
-        dir = QFileDialog.getExistingDirectory(self, "Choose a Downnloads Folder", os.path.expanduser('~')) # self, browser name, default path can also be ""
+        dir = QFileDialog.getExistingDirectory(self, "Choose a Folder", os.path.expanduser('~')) # self, browser name, default path can also be ""
 
         if dir:
             # If the user selected a path, proceed with download
@@ -391,9 +391,6 @@ class MainWindow(QMainWindow):
             self.image_processing_state()
             current_state = "Image_Processing"
 
-            # pop up loading screen after uploading images
-            #self.show_loading_screen()
-
         elif current_state == "Image_Processing":
             toolbar = self.findChild(QToolBar)
             # reset toolbar and central widget back to main state
@@ -401,6 +398,13 @@ class MainWindow(QMainWindow):
                 toolbar.removeAction(widget)
             self.main_state()
             current_state = "Main_Window"
+
+    def restore_previous_window(self):
+        # TODO: also set the progress bar back to 0% to start
+        global fits_images
+        while (len(fits_images) != 0):
+            fits_images.pop()
+        self.show_new_toolbar_main()
 
     def _createStatusBar(self):
         # default status is blank: ""
@@ -412,9 +416,6 @@ class MainWindow(QMainWindow):
         self.loading_screen.show()
 
         self.loading_screen.start(self.client, list(self.image_data.keys()), self)
-        # update the progress bar, and close 0.5s after getting to 100%
-        #self.loading_screen.progress()
-        #QTimer.singleShot(500, self.loading_screen.close)
 
 if __name__ == "__main__":
     app = QApplication([])
