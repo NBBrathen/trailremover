@@ -109,6 +109,7 @@ class LoadingScreen(QSplashScreen):
         self.close()
         print("All jobs completed!")
         self.main_window.image_processing_state() 
+        self.progressBar.setValue(0)
 
 
 class LoadImageWindow(QDialog):
