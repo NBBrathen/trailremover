@@ -2,78 +2,55 @@
 
 > **Automated satellite trail detection and removal for astronomical images using deep learning**
 
-A production-ready system that uses a U-Net neural network to automatically detect and remove satellite trails from FITS astronomical images, restoring affected pixels using advanced inpainting algorithms.
+A desktop application that uses a U-Net neural network to automatically detect and remove satellite trails from FITS astronomical images, restoring affected pixels using local background estimation with noise matching.
 
 ## Problem Statement
 
-Satellite trails are a growing problem in astrophotography, appearing as bright streaks across long-exposure images. Manual removal is time-consuming and requires expertise. Trail Remover automates this process using AI.
+Satellite trails are a growing problem in astrophotography, appearing as bright streaks across long-exposure images due to the increasing number of satellites in orbit. Manual removal is time-consuming and requires expertise. Trail Remover automates this process using AI.
 
 ## Key Features
 
-- **AI-Powered Detection**: U-Net neural network with 31M parameters
-- **Automatic Removal**: Seamless pixel restoration using inpainting
-- **Production-Ready**: Complete REST API with asynchronous processing
-- **Batch Processing**: Handle multiple images efficiently
-- **Format Support**: Works with FITS astronomical image format
+- **AI-Powered Detection**: U-Net neural network trained on astronomical images
+- **Intelligent Restoration**: Local background estimation with noise matching for seamless removal
+- **Desktop GUI**: User-friendly PyQt5 interface for batch processing
+- **Batch Processing**: Handle multiple FITS images efficiently
+- **Progress Tracking**: Real-time progress bar during processing
+- **Save Results**: Download corrected images to any folder
+
+## Screenshots
+
+The application displays the original image alongside the processed result, showing detected trails and the restoration quality.
 
 ## Technical Stack
 
 **Machine Learning:**
 - PyTorch 2.0+ - Deep learning framework
-- U-Net architecture - Semantic segmentation
-- Custom dataset loader with augmentation
-- IoU metrics for evaluation
+- U-Net architecture - Semantic segmentation (31M parameters)
+- Tile-based inference for large images
+- GPU acceleration support (CUDA)
 
 **Backend:**
-- FastAPI - Modern REST API framework
+- FastAPI - REST API with async job processing
 - Astropy - FITS file handling
-- OpenCV & scikit-image - Image processing
-- Pydantic - Data validation
+- OpenCV - Image processing
+- NumPy/SciPy - Numerical operations
 
-**Processing:**
-- Tile-based inference for large images
-- Multiple inpainting algorithms (Telea, Navier-Stokes, Biharmonic)
-- GPU acceleration support
-- Asynchronous job management
+**Frontend:**
+- PyQt5 - Cross-platform desktop GUI
+- Threaded processing - Non-blocking UI during uploads
+- Real-time progress updates
 
-## Performance
+## Restoration Algorithm
 
-- **Detection**: 25% validation IoU score
-- **Confidence**: Up to 85% on real astronomical images
-- **Speed**: ~5-30 seconds per image (GPU)
-- **Scale**: Successfully processed 3800+ pixel trails
+The restoration uses **local background estimation with noise matching**:
 
-## ML Pipeline
+1. **Mask Expansion**: Trail mask is dilated to capture faint edges
+2. **Block Processing**: Image processed in 64x64 blocks for efficiency
+3. **Local Statistics**: For each block, compute median and std of nearby non-trail pixels
+4. **Noise Matching**: Fill trail pixels with `local_median + gaussian_noise(local_std)`
+5. **Iterative Passes**: Multiple passes with increasing mask expansion catch halos
 
-### Training Data
-- 70 labeled PNG images with JSON annotations
-- Data augmentation (flips, rotations, noise, brightness/contrast)
-- Train/validation split (80/20)
-
-### Model Architecture
-- **Network**: U-Net with skip connections
-- **Parameters**: 31 million trainable parameters
-- **Input**: 512×512 RGB patches
-- **Output**: Binary segmentation mask
-- **Loss**: Combined BCE + Dice Loss
-
-### Training Results
-```
-Epoch   Train Loss   Val Loss   Val IoU
-  1       0.3254      0.3189     0.2%
- 50       0.0891      0.0856    12.4%
-100       0.0423      0.0398    25.1%
-```
-
-## API Endpoints
-
-```
-POST   /api/v1/images/upload          - Upload FITS image
-GET    /api/v1/jobs/{job_id}          - Check job status
-GET    /api/v1/jobs/{job_id}/detections - Get detected trails
-POST   /api/v1/jobs/{job_id}/correct  - Apply corrections
-GET    /api/v1/jobs/{job_id}/download - Download result
-```
+This approach preserves the natural noise texture of the sky background, unlike traditional inpainting which creates smooth "scars".
 
 ## Project Structure
 
@@ -81,97 +58,170 @@ GET    /api/v1/jobs/{job_id}/download - Download result
 trailremover/
 ├── backend/
 │   ├── app/
-│   │   ├── api/         # REST API endpoints
-│   │   ├── core/        # Detection & restoration
-│   │   ├── models/      # Data models
-│   │   └── services/    # Business logic
+│   │   ├── api/v1/endpoints/   # REST API endpoints
+│   │   ├── core/
+│   │   │   ├── detection.py    # Trail detection logic
+│   │   │   └── restoration.py  # Pixel restoration
+│   │   ├── models/             # Pydantic data models
+│   │   ├── services/
+│   │   │   ├── image_processor.py
+│   │   │   └── job_manager.py
+│   │   ├── config.py           # Settings
+│   │   └── main.py             # FastAPI app
 │   ├── ml/
-│   │   ├── model.py     # U-Net architecture
-│   │   ├── dataset.py   # Dataset loader
-│   │   ├── train.py     # Training pipeline
-│   │   └── inference.py # Production inference
-│   └── data/
-│       └── models/      # Trained model weights
-└── frontend/
-    ├── api_client.py    # Backend interface
-    └── [GUI components] # PyQt5 interface
+│   │   ├── model.py            # U-Net architecture
+│   │   ├── dataset.py          # Dataset loader
+│   │   ├── train.py            # Training pipeline
+│   │   └── inference.py        # Production inference
+│   ├── data/models/            # Trained model weights
+│   └── requirements.txt
+├── frontend/
+│   ├── main_window.py          # Main GUI application
+│   ├── api_client.py           # Backend API client
+│   ├── load_image.ui           # Qt Designer UI
+│   └── loading_screen.ui
+└── README.md
 ```
 
-## Key Learnings
+## Installation
 
-**Machine Learning:**
-- Semantic segmentation for object detection
-- U-Net architecture and skip connections
-- Training pipeline with proper validation
-- Handling class imbalance in pixel-wise tasks
+### Prerequisites
+- Python 3.8+
+- Git LFS (for model weights)
 
-**Software Engineering:**
-- RESTful API design and implementation
-- Asynchronous job processing
-- State machine design for workflow management
-- Production ML system integration
+### Setup
 
-**Domain Knowledge:**
-- FITS astronomical image format
-- Histogram stretching for astronomy
-- Inpainting algorithms and applications
+```bash
+# Clone repository
+git clone https://github.com/yourusername/trailremover.git
+cd trailremover
 
-## Results
+# Install Git LFS and pull model
+git lfs install
+git lfs pull
 
-**Successful Detection Examples:**
-- 79% confidence on 3854-pixel trail
-- Multiple trail detection in single image
-- Orientation-invariant (horizontal, vertical, diagonal)
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
 
-**Restoration Quality:**
-- Seamless pixel restoration
-- No visible artifacts
-- Astronomical features preserved
+# Install backend dependencies
+cd backend
+pip install -r requirements.txt
 
-## Technical Challenges Solved
+# Install frontend dependencies
+cd ../frontend
+pip install PyQt5 requests astropy opencv-python matplotlib numpy
+```
 
-1. **Memory Management**: Reduced batch size from 8→4 for GPU constraints
-2. **Large Images**: Implemented tile-based processing with overlap
-3. **False Positives**: Length filtering and duplicate merging
-4. **Performance**: GPU acceleration and efficient data pipeline
+### GPU Support (Optional)
+For faster processing with NVIDIA GPU:
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+```
 
-## Deployment
+## Usage
 
-**Backend:**
+### 1. Start the Backend
 ```bash
 cd backend
 python -m app.main
 ```
+You should see:
+```
+INFO: ML detector initialized successfully
+INFO: Uvicorn running on http://127.0.0.1:8000
+```
 
-**Requirements:**
-- Python 3.8+
-- PyTorch 2.0+ (with CUDA for GPU)
-- FastAPI, Astropy, OpenCV
-- Trained model weights
+### 2. Start the Frontend
+In a new terminal:
+```bash
+cd frontend
+python main_window.py
+```
 
-## API Integration
+### 3. Process Images
+1. Click **"Load Images"**
+2. Browse to a folder containing FITS files
+3. Click **"Upload"** - processing begins automatically
+4. View results by clicking on any image in the list
+5. Click **"Save"** to download corrected images
 
-Complete API client provided for frontend integration:
-- Simple Python interface
-- Async operation support
-- Comprehensive error handling
-- Full documentation included
+## API Endpoints
 
-## Metrics
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/images/upload` | Upload FITS image |
+| GET | `/api/v1/jobs/{job_id}` | Check job status |
+| GET | `/api/v1/jobs/{job_id}/detections` | Get detected trails |
+| POST | `/api/v1/jobs/{job_id}/correct` | Apply corrections |
+| GET | `/api/v1/jobs/{job_id}/download` | Download result |
 
-- **Lines of Code**: ~1,200 ML code, ~800 backend code
-- **Training Time**: 100 epochs on RTX 2070
-- **Model Size**: 250 MB (saved weights)
-- **API Endpoints**: 5 RESTful endpoints
-- **Test Success Rate**: 100% on validation workflow
+## Configuration
 
-## Project Highlights
+Edit `backend/app/config.py` to customize:
 
-- Production-ready ML system  
-- Complete backend infrastructure  
-- Fully tested and documented  
-- Real astronomical data validation  
-- Scalable architecture  
+```python
+CONFIDENCE_THRESHOLD = 0.5   # Detection sensitivity (lower = more detections)
+MIN_TRAIL_PIXELS = 50        # Minimum trail size
+```
 
+Edit `backend/app/services/image_processor.py` for restoration:
 
-**Built with PyTorch, FastAPI, and Computer Vision techniques for automated astronomical image processing.**
+```python
+restore_pixels_local_background_iterative(
+    image_data,
+    trails,
+    sample_radius=30,   # Pixels to sample for background
+    base_expand=8,      # Initial mask expansion
+    passes=3            # Number of restoration passes
+)
+```
+
+## Training (Optional)
+
+To train on your own data:
+
+1. Place labeled images in `backend/data/raw/`
+   - PNG images with corresponding JSON (LabelMe format)
+   - Label trails as "trail", "satellite", or "streak"
+
+2. Run training:
+```bash
+cd backend
+python -m ml.train
+```
+
+## Troubleshooting
+
+### "Model not found" error
+```bash
+cd backend
+git lfs pull
+```
+
+### PyTorch 2.6 compatibility
+The code includes `weights_only=False` for torch.load() compatibility.
+
+### Slow processing on CPU
+- Process 2-3 images at a time
+- Consider installing CUDA PyTorch for GPU acceleration
+
+### Trail still visible after processing
+- Increase `base_expand` parameter (try 12-15)
+- Increase `passes` parameter (try 4-5)
+
+## Performance
+
+- **Detection Speed**: ~3-15 seconds per image (GPU), ~30-60 seconds (CPU)
+- **Model Size**: 250 MB
+- **Memory Usage**: ~2GB GPU VRAM for inference
+
+## Team
+
+- **Backend/ML**: Trail detection, restoration algorithms, API development
+- **Frontend**: PyQt5 GUI, user experience
+
+---
+
+**Built with PyTorch, FastAPI, and PyQt5 for automated astronomical image processing.**
